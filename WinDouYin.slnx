@@ -1,0 +1,16 @@
+<Solution>
+  <Configurations>
+    <Platform Name="ARM64" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="WinDouYin/WinDouYin.csproj">
+    <Platform Solution="*|ARM64" Project="ARM64" />
+    <Platform Solution="*|x64" Project="x64" />
+    <Platform Solution="*|x86" Project="x86" />
+    <Deploy />
+  </Project>
+  <Project Path="WinDouYin.Contracts/WinDouYin.Contracts.csproj" />
+  <Project Path="WinDouYin.Core/WinDouYin.Core.csproj" />
+  <Project Path="WinDouYin.Douyin/WinDouYin.Douyin.csproj" />
+</Solution>

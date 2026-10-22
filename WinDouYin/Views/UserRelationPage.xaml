@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinDouYin.Views.UserRelationPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:WinDouYin.ViewModels"
+    mc:Ignorable="d"
+    NavigationCacheMode="Disabled">
+
+    <!-- 「关注 / 粉丝」列表：只从自己的主页进（2026-10-20 实测官方他人主页点粉丝数不发请求、无弹层）。
+         行是无框 Button，点行开对方主页；列表用 ItemsRepeater + StackLayout（虚拟化）。 -->
+    <Page.Resources>
+        <Style x:Key="RelationRowStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+    </Page.Resources>
+
+    <Grid Padding="24,0,24,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 返回归左栏那颗 NavigationView BackButton，页头只放标题与计数 -->
+        <Grid Grid.Row="0" Margin="0,16,0,8" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Spacing="2" VerticalAlignment="Center">
+                <TextBlock Text="{x:Bind ViewModel.Title, Mode=OneWay}"
+                           Style="{StaticResource SubtitleTextBlockStyle}" />
+                <TextBlock Text="{x:Bind ViewModel.CountLabel, Mode=OneWay}"
+                           Style="{StaticResource CaptionTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+            </StackPanel>
+
+            <ProgressRing Grid.Column="1"
+                          Width="20"
+                          Height="20"
+                          IsActive="True"
+                          Visibility="{x:Bind ViewModel.LoadingVisibility, Mode=OneWay}" />
+        </Grid>
+
+        <ScrollViewer x:Name="ListScroll"
+                      Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      VerticalScrollMode="Auto"
+                      ViewChanged="OnScrollChanged">
+            <StackPanel>
+                <ItemsRepeater ItemsSource="{x:Bind ViewModel.Rows}">
+                    <ItemsRepeater.Layout>
+                        <StackLayout Spacing="4" />
+                    </ItemsRepeater.Layout>
+                    <ItemsRepeater.ItemTemplate>
+                        <DataTemplate x:DataType="vm:UserRelationRow">
+                            <Button Style="{StaticResource RelationRowStyle}"
+                                    Tag="{x:Bind SecUid}"
+                                    Click="OnRowClick">
+                                <Grid Padding="8,8" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <PersonPicture Width="48"
+                                                   Height="48"
+                                                   VerticalAlignment="Top"
+                                                   ProfilePicture="{x:Bind Avatar}"
+                                                   Initials="{x:Bind Initials}" />
+
+                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind Name}"
+                                                   Style="{StaticResource BodyStrongTextBlockStyle}"
+                                                   TextTrimming="CharacterEllipsis" />
+
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <TextBlock Text="{x:Bind HandleText}"
+                                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                                       Visibility="{x:Bind HandleVisibility}"
+                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                            <TextBlock Text="{x:Bind StatsText}"
+                                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                                       Visibility="{x:Bind StatsVisibility}"
+                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                        </StackPanel>
+
+                                        <TextBlock Text="{x:Bind Signature}"
+                                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                                   MaxLines="1"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Visibility="{x:Bind SignatureVisibility}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsRepeater.ItemTemplate>
+                </ItemsRepeater>
+
+                <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                           Style="{StaticResource BodyTextBlockStyle}"
+                           HorizontalAlignment="Center"
+                           Margin="0,32"
+                           Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

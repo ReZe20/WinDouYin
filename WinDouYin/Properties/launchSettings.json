@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "WinDouYin (Unpackaged)": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

@@ -1,0 +1,78 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    取数那半——唯一真的在跟抖音服务器对话的工程。
+    它在两个仓里是**同一枚工程文件**，编进去的源码却按档位二选一：
+
+      Real 档（只有私有仓 WinDouYin-dev 命中）
+        Native/ 报文与会话、Signing/ 三套签名（a_bogus、bd-ticket-guard、webSign）、
+        Service/ 里存 cookie 与 guard 材料与服务端回包快照的那三个、FeedService（会话罐与多账号倒罐）。
+        签名那两份资产内嵌进来，不落散文件。
+      Stub 档（公开仓 clone 出来的样子：上面那些源码被 .gitignore 整片挡在门外，盘上就没有）
+        只编 StubFeed.cs——一份把 IDouyinFeed 全部成员回空/回失败的实现。
+        它的用途是**构建验证**：证明开源那半不依赖任何闭源源码也能编译过，并顺带把各页的空态跑出来。
+        它不是测试替身，也不承诺行为——想让应用真出数据，得把私有仓出的 dll 或源码放进来。
+
+    档位判定用"真源码在不在"，所以私有仓不需要任何额外开关就吃真的；
+    要在私有仓里验那一档"没有后端"的构建（这是唯一能证明公开仓可独立构建的手段——公开仓 clone 到你
+    机器上时那些文件是被 ignore 掉的、看不见，本地跑一次 -p:DouyinBackend=Stub 才叫验证）：
+        dotnet build WinDouYin.Douyin/WinDouYin.Douyin.csproj -p:DouyinBackend=Stub
+    公开仓那边不需要传参：Native/NativeFeed.cs 不存在，自动落到 Stub。
+
+    TFM 用裸 net10.0（不带 -windows）：这半不沾 WinRT，Uno 走 Linux/macOS 时它照用。
+    第 106 轮之前这条由 tools/PortCheck 代验，本工程立起来之后 PortCheck 已删除：同一件事不需要两枚工装。
+  -->
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>WinDouYin.Douyin</AssemblyName>
+    <RootNamespace>WinDouYin</RootNamespace>
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <DouyinBackend Condition="'$(DouyinBackend)' == '' and Exists('$(MSBuildProjectDirectory)\Native\NativeFeed.cs')">Real</DouyinBackend>
+    <DouyinBackend Condition="'$(DouyinBackend)' == ''">Stub</DouyinBackend>
+    <DefineConstants Condition="'$(DouyinBackend)' == 'Stub'">$(DefineConstants);DOUYIN_STUB</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WinDouYin.Contracts\WinDouYin.Contracts.csproj" />
+    <ProjectReference Include="..\WinDouYin.Core\WinDouYin.Core.csproj" />
+  </ItemGroup>
+
+  <!-- 两档都要编：对界面唯一的 public 入口，它只做一次挂载，本体不含任何线上知识。 -->
+  <ItemGroup>
+    <Compile Include="DouyinBoot.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(DouyinBackend)' == 'Real'">
+    <Compile Include="Native\**\*.cs" />
+    <Compile Include="Signing\**\*.cs" />
+    <Compile Include="Service\**\*.cs" />
+    <Compile Include="FeedService.cs" />
+    <!--
+      逻辑名钉成 sign.<文件名>：Signing/SigningAssets.cs 按 EndsWith("sign." + 文件名) 认内嵌资源，
+      不钉的话名字会带上 RootNamespace 前缀，将来改 RootNamespace 就悄悄断在这儿。
+    -->
+    <EmbeddedResource Include="Assets\sign\abogus-profile.json">
+      <LogicalName>sign.abogus-profile.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\sign\ticket-guard-server-cert.pem">
+      <LogicalName>sign.ticket-guard-server-cert.pem</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(DouyinBackend)' == 'Stub'">
+    <Compile Include="StubFeed.cs" />
+  </ItemGroup>
+
+  <Target Name="ReportDouyinBackend" AfterTargets="BeforeBuild" Condition="'$(IsBuildProject)' != 'false'">
+    <Message Importance="high" Text="WinDouYin.Douyin 档位：$(DouyinBackend)（Real=闭源源码在场，Stub=空实现，只作构建验证）" />
+  </Target>
+
+</Project>

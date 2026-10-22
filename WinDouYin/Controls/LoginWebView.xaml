@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="WinDouYin.Controls.LoginWebView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:ui="using:Microsoft.UI.Xaml.Controls"
+    mc:Ignorable="d">
+
+    <!-- 只放官方登录框：页面加载后用脚本把弹窗以外的整站藏掉，所以这块尺寸就是登录框的尺寸。
+         尺寸跟抖音登录卡片的自然比例走：726x483（2026-10-12 日志实测，卡片在 460x560 视口里就是
+         726x483，横向 1.50:1）。舞台与卡片同比例时，裁剪脚本的缩放是均匀的、卡片正好铺满；
+         宿主用 FitTo 给预算，构造时默认就是 1:1 的 726x483。 -->
+    <Grid x:Name="Stage"
+          Background="White">
+        <ui:WebView2 x:Name="Web" />
+        <!-- 不透明的等待层：内核从建起来到裁出登录框这段时间里，官网整页不许露脸，只转圈。
+             第一次裁到登录框（isolated）后由代码收敛成 Collapsed，露出下面裁好的官方登录框；
+             弹窗又关了/还没出来的时候它回来继续转。 -->
+        <Grid x:Name="Cover"
+              Background="White">
+            <StackPanel VerticalAlignment="Center"
+                        Spacing="10">
+                <ProgressRing x:Name="Spin"
+                              Width="40"
+                              Height="40"
+                              HorizontalAlignment="Center"
+                              IsActive="True" />
+                <TextBlock x:Name="Hint"
+                           x:Uid="LoginWebView_Hint"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

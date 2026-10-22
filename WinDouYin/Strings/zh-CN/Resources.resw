@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="SearchBox.PlaceholderText" xml:space="preserve">
+    <value>搜索你感兴趣的内容</value>
+  </data>
+  <data name="Nav_Featured" xml:space="preserve">
+    <value>精选</value>
+  </data>
+  <data name="Nav_ForYou" xml:space="preserve">
+    <value>推荐</value>
+  </data>
+  <data name="Nav_Ai" xml:space="preserve">
+    <value>AI抖音</value>
+  </data>
+  <data name="Nav_Following" xml:space="preserve">
+    <value>关注</value>
+  </data>
+  <data name="Nav_Friends" xml:space="preserve">
+    <value>朋友</value>
+  </data>
+  <data name="Nav_Me" xml:space="preserve">
+    <value>我的</value>
+  </data>
+  <data name="Nav_Live" xml:space="preserve">
+    <value>直播</value>
+  </data>
+  <data name="Nav_Account" xml:space="preserve">
+    <value>账号</value>
+  </data>
+  <data name="FeaturedPage_Title.Text" xml:space="preserve">
+    <value>精选</value>
+  </data>
+  <data name="ForYouPage_Title.Text" xml:space="preserve">
+    <value>推荐</value>
+  </data>
+  <data name="AiPage_Title.Text" xml:space="preserve">
+    <value>AI抖音</value>
+  </data>
+  <data name="FollowingPage_Title.Text" xml:space="preserve">
+    <value>关注</value>
+  </data>
+  <data name="FriendsPage_Title.Text" xml:space="preserve">
+    <value>朋友</value>
+  </data>
+  <data name="MePage_Title.Text" xml:space="preserve">
+    <value>我的</value>
+  </data>
+  <data name="LivePage_Title.Text" xml:space="preserve">
+    <value>直播</value>
+  </data>
+  <data name="HelpPage_Title.Text" xml:space="preserve">
+    <value>帮助</value>
+  </data>
+  <data name="SettingsPage_Title.Text" xml:space="preserve">
+    <value>设置</value>
+  </data>
+  <data name="Settings_Program.Text" xml:space="preserve">
+    <value>程序</value>
+  </data>
+  <data name="Settings_StartupPage.Header" xml:space="preserve">
+    <value>启动页面</value>
+  </data>
+  <data name="Settings_StartupPage.Description" xml:space="preserve">
+    <value>应用启动时进入的页面，下次启动生效</value>
+  </data>
+  <data name="Settings_Playback.Text" xml:space="preserve">
+    <value>播放与缓存</value>
+  </data>
+  <data name="Settings_VideoCache.Description" xml:space="preserve">
+    <value>把看过的视频分块留一份到本机，重新打开时起播更快；关掉后不再读写磁盘，已有缓存保留</value>
+  </data>
+  <data name="Settings_VideoCacheToggle.Content" xml:space="preserve">
+    <value>视频磁盘缓存</value>
+  </data>
+  <data name="Settings_ResetHeader.Text" xml:space="preserve">
+    <value>重置设置</value>
+  </data>
+  <data name="Settings_ResetButton.Content" xml:space="preserve">
+    <value>恢复默认设置</value>
+  </data>
+  <data name="Settings_ResetConfirm.Title" xml:space="preserve">
+    <value>恢复所有默认设置？</value>
+  </data>
+  <data name="Settings_ResetConfirm.Content" xml:space="preserve">
+    <value>所有设置将回到默认值，此操作无法撤销。</value>
+  </data>
+  <data name="Settings_ResetConfirm.PrimaryButtonText" xml:space="preserve">
+    <value>重置</value>
+  </data>
+  <data name="Settings_ResetConfirm.CloseButtonText" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="TitleBar_Account" xml:space="preserve">
+    <value>账号</value>
+  </data>
+  <data name="LoginPanel_Title.Text" xml:space="preserve">
+    <value>登录</value>
+  </data>
+  <data name="LoginPanel_LoggedIn.Text" xml:space="preserve">
+    <value>已登录</value>
+  </data>
+  <data name="LoginPanel_Reload.Content" xml:space="preserve">
+    <value>重新打开登录框</value>
+  </data>
+  <data name="LoginPanel_SignOut.Content" xml:space="preserve">
+    <value>退出登录</value>
+  </data>
+  <data name="LoginWebView_Hint.Text" xml:space="preserve">
+    <value>正在打开官方登录框</value>
+  </data>
+  <data name="AccountFlyout_Messages.Content" xml:space="preserve">
+    <value>消息</value>
+  </data>
+  <data name="AccountFlyout_Login.Content" xml:space="preserve">
+    <value>登录</value>
+  </data>
+  <data name="AccountFlyout_Add.Content" xml:space="preserve">
+    <value>添加账号</value>
+  </data>
+  <data name="AccountFlyout_SignOut.Content" xml:space="preserve">
+    <value>退出登录</value>
+  </data>
+</root>

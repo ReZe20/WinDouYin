@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="WinDouYin.Controls.ReplyCardControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:WinDouYin.Controls"
+    xmlns:conv="using:WinDouYin.Converters"
+    xmlns:vm="using:WinDouYin.ViewModels">
+
+    <UserControl.Resources>
+        <!-- 回复那颗心：字形与颜色都由"赞没赞过"转出来（与一级评论同一套转换器） -->
+        <conv:CommentLikeGlyphConverter x:Key="CommentLikeGlyphConverter" />
+        <conv:CommentLikeBrushConverter x:Key="CommentLikeBrushConverter" />
+    </UserControl.Resources>
+
+    <!-- 回复卡：自己的内容 + 展开后嵌在卡内的子回复卡；父卡天然把子卡包在里面。
+         全部用 WinUI 3 主题资源，明暗主题与系统强调色自动跟随。
+         绑定全部走 x:Bind(Row.*)：一张回复卡二十多个属性，反射 {Binding} 在成批展开时开销明显。 -->
+    <Border Style="{StaticResource CommentCardStyle}"
+            Padding="10"
+            Margin="0,6,0,0">
+        <StackPanel Spacing="4">
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <PersonPicture Width="24"
+                               Height="24"
+                               VerticalAlignment="Top"
+                               ProfilePicture="{x:Bind Row.Avatar}"
+                               Initials="{x:Bind Row.Initials}" />
+                <StackPanel Grid.Column="1" Spacing="2">
+                    <TextBlock Text="{x:Bind Row.Author}"
+                               Style="{StaticResource BodyStrongTextBlockStyle}"
+                               Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                    <!-- "回复 @父昵称"小胶囊 -->
+                    <Border Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                            CornerRadius="4"
+                            Padding="6,1"
+                            HorizontalAlignment="Left"
+                            Visibility="{x:Bind Row.ReplyToVisibility}">
+                        <TextBlock Text="{x:Bind Row.ReplyToLabel}"
+                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </Border>
+                    <RichTextBlock controls:EmojiText.Text="{x:Bind Row.Text}"
+                                   FontSize="14"
+                                   Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                   TextWrapping="Wrap" />
+                    <!-- 图片评论：单图按原比例画（点开看原图）；多图摆方网格 -->
+                    <Button Tag="{x:Bind Row.SingleImageUrl}"
+                            Visibility="{x:Bind Row.SingleImageVisibility}"
+                            Padding="0"
+                            BorderThickness="0"
+                            Background="Transparent"
+                            HorizontalAlignment="Left"
+                            Click="OnImageClick">
+                        <Image Source="{x:Bind Row.SingleImageSource}"
+                               Width="{x:Bind Row.SingleImageWidth}"
+                               Height="{x:Bind Row.SingleImageHeight}"
+                               Stretch="Uniform" />
+                    </Button>
+                    <ItemsRepeater ItemsSource="{x:Bind Row.Images}"
+                                   Visibility="{x:Bind Row.ImageGridVisibility}">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="64"
+                                               MinItemHeight="64"
+                                               MinRowSpacing="6"
+                                               MinColumnSpacing="6"
+                                               ItemsStretch="Fill"
+                                               MaximumRowsOrColumns="3" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="vm:CommentImageViewModel">
+                                <Button Tag="{x:Bind Url}"
+                                        Padding="0"
+                                        BorderThickness="0"
+                                        Background="Transparent"
+                                        Click="OnImageClick">
+                                    <Image Source="{x:Bind Source}"
+                                           Width="64"
+                                           Height="64"
+                                           Stretch="UniformToFill" />
+                                </Button>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                    <!-- 表情包：按原比例画，点开也能放大 -->
+                    <Button Tag="{x:Bind Row.StickerUrl}"
+                            Visibility="{x:Bind Row.StickerVisibility}"
+                            Padding="0"
+                            BorderThickness="0"
+                            Background="Transparent"
+                            HorizontalAlignment="Left"
+                            Click="OnImageClick">
+                        <Image Source="{x:Bind Row.StickerSource}"
+                               Width="{x:Bind Row.StickerWidth}"
+                               Height="{x:Bind Row.StickerHeight}"
+                               Stretch="Uniform" />
+                    </Button>
+                    <!-- 尾注：时间在左，回复/点赞按钮在右 -->
+                    <Grid ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Bind Row.Meta}"
+                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                   VerticalAlignment="Center" />
+                        <Button Grid.Column="1"
+                                Padding="4,1"
+                                MinHeight="0"
+                                MinWidth="0"
+                                BorderThickness="0"
+                                Background="Transparent"
+                                HorizontalAlignment="Right"
+                                ToolTipService.ToolTip="回复这条"
+                                Click="OnReplyClick">
+                            <TextBlock Text="回复"
+                                       FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                       VerticalAlignment="Center" />
+                        </Button>
+                        <Button Grid.Column="2"
+                                Padding="4,1"
+                                MinHeight="0"
+                                MinWidth="0"
+                                BorderThickness="0"
+                                Background="Transparent"
+                                HorizontalAlignment="Right"
+                                ToolTipService.ToolTip="赞这条回复"
+                                Click="OnLikeClick">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <FontIcon FontSize="12"
+                                          Glyph="{x:Bind Row.Liked, Mode=OneWay, Converter={StaticResource CommentLikeGlyphConverter}}"
+                                          Foreground="{x:Bind Row.Liked, Mode=OneWay, Converter={StaticResource CommentLikeBrushConverter}}" />
+                                <TextBlock Text="{x:Bind Row.LikeLabel, Mode=OneWay}"
+                                           FontSize="12"
+                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <!-- 链接字用系统强调色（HyperlinkButton 默认就是 AccentTextFillColorPrimaryBrush） -->
+                    <HyperlinkButton Content="{x:Bind Row.ExpandLabel}"
+                                     Visibility="{x:Bind Row.ExpandVisibility}"
+                                     FontSize="12"
+                                     Padding="0,2,0,2"
+                                     MinHeight="0"
+                                     HorizontalAlignment="Left"
+                                     Click="OnExpandClick" />
+                </StackPanel>
+            </Grid>
+
+            <!-- 子回复：嵌在父卡内部；负边距抵消父卡水平 padding，所有层级卡片左缘对齐、不再缩进 -->
+            <ItemsControl ItemsSource="{x:Bind Row.Children}" Margin="-10,0,-10,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:CommentReplyRowViewModel">
+                        <controls:ReplyCardControl ImageTapped="OnChildImageTapped" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </Border>
+</UserControl>

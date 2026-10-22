@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    开源契约面：界面与取数层之间唯一的可见接口，加上两边共用的数据形状。
+    这里是**权威**——闭源那半（WinDouYin-dev）编译时吃的是这同一套类型。
+    TFM 用裸 net10.0（不带 -windows）：这一层不能沾任何 WinRT 类型，否则 Uno 走 Linux/macOS 就断在这。
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>WinDouYin.Contracts</AssemblyName>
+    <RootNamespace>WinDouYin.Contracts</RootNamespace>
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,1036 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinDouYin.Views.UserProfilePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:WinDouYin.ViewModels"
+    mc:Ignorable="d"
+    NavigationCacheMode="Required">
+
+    <!-- 用户主页按 WinUI 3 设计语言重排：顶部是标准页头（返回 + 页名），资料收进一张系统卡片
+         （封面作横幅、头像/昵称/统计/简介/操作都在普通主题底色上）。不再用「377 高封面压白字」那套网页仿制，
+         深色/浅色主题都由 ThemeResource 出；字阶只用 Title/Subtitle/Body/BodyStrong/Caption。
+         页签仍是系统 SelectorBar，内容卡仍是带描边的 Button 卡（悬停/按下/焦点由控件自带）。 -->
+
+    <Page.Resources>
+        <!-- 封面上的角标是"媒体覆盖层"：固定深底白字，不随主题翻（浅色主题下白底白字会看不见）。
+             与搜索页卡片的角标同一口径。 -->
+        <SolidColorBrush x:Key="ProfileMediaBadgeBrush" Color="#B3000000" />
+        <SolidColorBrush x:Key="ProfileMediaBadgeTextBrush" Color="White" />
+
+        <!-- 卡=带描边的系统卡片。外圆角用 OverlayCornerRadius（8，与资料卡同一档），
+             封面再往里收 4px 用 ControlCornerRadius（4）——8 减 4 正好同心，卡面与描边在四周露出来；
+             媒体直接铺到卡沿会把圆角盖住，整张卡看着就是一张方图（截图实测）。 -->
+        <Style x:Key="ProfileCardButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{ThemeResource OverlayCornerRadius}" />
+        </Style>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 页头：页名；正在取时右边转一圈（翻页也走同一颗）。返回归左栏那颗 NavigationView BackButton，
+             本人主页是根页面、回访栈是空的，那颗自然不出现——原来靠 BackVisibility 分的那一档不用在这儿做了。 -->
+        <Grid Grid.Row="0" Margin="24,16,24,12" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="{x:Bind ViewModel.PageTitle, Mode=OneWay}"
+                       Style="{StaticResource SubtitleTextBlockStyle}"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" />
+
+            <ProgressRing Grid.Column="1"
+                          Width="20"
+                          Height="20"
+                          IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                          Visibility="{x:Bind ViewModel.LoadingVisibility, Mode=OneWay}" />
+        </Grid>
+
+        <ScrollViewer x:Name="PageScroll"
+                      Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      VerticalScrollMode="Auto"
+                      Visibility="{x:Bind ViewModel.SelfProfileBodyVisibility, Mode=OneWay}"
+                      ViewChanged="OnScrollChanged">
+            <StackPanel Padding="24,0,24,32">
+
+                <!-- 资料卡：封面横幅 + 头像（压进横幅 44px）+ 昵称/认证/直播标 + 三数 + 抖音号/IP/地区 + 简介 + 操作，
+                     第三行是本人的「使用热力图」段（只本人页亮，2026-10-21 口述直接塞进卡里，不再另起一张卡）。
+                     圆角交给 OverlayCornerRadius；文字都在主题底色上，不再依赖封面颜色。 -->
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{ThemeResource OverlayCornerRadius}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- 横幅：没有封面时留一块主题表面色，不用黑色兜底 -->
+                        <Grid Height="160"
+                              Background="{ThemeResource ControlFillColorSecondaryBrush}">
+                            <Image Source="{x:Bind ViewModel.CoverImage, Mode=OneWay}"
+                                   Stretch="UniformToFill"
+                                   Visibility="{x:Bind ViewModel.CoverVisibility, Mode=OneWay}" />
+                        </Grid>
+
+                        <Grid Grid.Row="1" Padding="16" ColumnSpacing="20">
+                            <!-- 宽度不够时操作按钮从右侧第三列落到信息下方（一行变两行），
+                                 窄窗不会把昵称和简介挤成一条缝。阈值取 720：再窄三列就放不下。 -->
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup>
+                                    <VisualState x:Name="WideProfile">
+                                        <VisualState.StateTriggers>
+                                            <AdaptiveTrigger MinWindowWidth="720" />
+                                        </VisualState.StateTriggers>
+                                        <VisualState.Setters>
+                                            <Setter Target="ActionsPanel.(Grid.Row)" Value="0" />
+                                            <Setter Target="ActionsPanel.(Grid.Column)" Value="2" />
+                                            <Setter Target="ActionsPanel.(Grid.ColumnSpan)" Value="1" />
+                                            <Setter Target="ActionsPanel.Margin" Value="0" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="NarrowProfile">
+                                        <VisualState.StateTriggers>
+                                            <AdaptiveTrigger MinWindowWidth="0" />
+                                        </VisualState.StateTriggers>
+                                        <VisualState.Setters>
+                                            <Setter Target="ActionsPanel.(Grid.Row)" Value="1" />
+                                            <Setter Target="ActionsPanel.(Grid.Column)" Value="1" />
+                                            <Setter Target="ActionsPanel.(Grid.ColumnSpan)" Value="2" />
+                                            <Setter Target="ActionsPanel.Margin" Value="0,8,0,0" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- 头像：104 外圈 + 96 正圆，向上压 44 进横幅；取不到图就垫昵称首字 -->
+                            <Border Width="104"
+                                    Height="104"
+                                    Margin="0,-44,0,0"
+                                    VerticalAlignment="Top"
+                                    CornerRadius="52"
+                                    Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    Padding="3">
+                                <PersonPicture Width="96"
+                                               Height="96"
+                                               ProfilePicture="{x:Bind ViewModel.AvatarImage, Mode=OneWay}"
+                                               Initials="{x:Bind ViewModel.Initials, Mode=OneWay}" />
+                            </Border>
+
+                            <StackPanel Grid.Column="1" Spacing="8">
+                                <!-- 昵称 + 认证（系统对勾字形 + 文案） + 直播标（系统警告色，只标识不跳转）。
+                                     昵称拿 * 列，长名字在认证标之前先截断，不会把右侧操作顶出去。 -->
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Text="{x:Bind ViewModel.Nickname, Mode=OneWay}"
+                                               Style="{StaticResource TitleTextBlockStyle}"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" />
+
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                Spacing="4"
+                                                VerticalAlignment="Center"
+                                                ToolTipService.ToolTip="官方认证"
+                                                Visibility="{x:Bind ViewModel.VerifyVisibility, Mode=OneWay}">
+                                        <FontIcon FontSize="14"
+                                                  Glyph="&#xE73E;"
+                                                  Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                                  VerticalAlignment="Center" />
+                                        <TextBlock Text="{x:Bind ViewModel.VerifyLabel, Mode=OneWay}"
+                                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+
+                                    <Border Grid.Column="2"
+                                            Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}"
+                                            CornerRadius="{ThemeResource ControlCornerRadius}"
+                                            Padding="6,2"
+                                            VerticalAlignment="Center"
+                                            ToolTipService.ToolTip="直播中（应用内暂不支持观看直播）"
+                                            Visibility="{x:Bind ViewModel.IsLivingVisibility, Mode=OneWay}">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <Ellipse Width="6"
+                                                     Height="6"
+                                                     Fill="{ThemeResource SystemFillColorCriticalBrush}"
+                                                     VerticalAlignment="Center" />
+                                            <TextBlock Text="直播中"
+                                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                                       Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- 抖音号 / IP 属地 / 年龄·地区（ip_location 实测自带「IP属地：」前缀，照抄） -->
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <TextBlock Text="{x:Bind ViewModel.HandleLine, Mode=OneWay}"
+                                               Style="{StaticResource CaptionTextBlockStyle}"
+                                               Visibility="{x:Bind ViewModel.HandleVisibility, Mode=OneWay}"
+                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                    <TextBlock Text="{x:Bind ViewModel.IpLine, Mode=OneWay}"
+                                               Style="{StaticResource CaptionTextBlockStyle}"
+                                               Visibility="{x:Bind ViewModel.IpVisibility, Mode=OneWay}"
+                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                    <TextBlock Text="{x:Bind ViewModel.RegionLine, Mode=OneWay}"
+                                               Style="{StaticResource CaptionTextBlockStyle}"
+                                               Visibility="{x:Bind ViewModel.RegionVisibility, Mode=OneWay}"
+                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                </StackPanel>
+
+                                <!-- 三数：数字在上、标签在下。他人主页只是文本（官方实测点它们不发请求、无弹层）；
+                                     自己的主页把三数做成可点块，进关注/粉丝列表。 -->
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="24"
+                                            Visibility="{x:Bind ViewModel.StatsVisibility, Mode=OneWay}">
+                                    <StackPanel Orientation="Horizontal"
+                                                Spacing="24"
+                                                Visibility="{x:Bind ViewModel.StatsTextVisibility, Mode=OneWay}">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{x:Bind ViewModel.FollowCountText, Mode=OneWay}"
+                                                       Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                            <TextBlock Text="关注"
+                                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                        </StackPanel>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{x:Bind ViewModel.FollowerCountText, Mode=OneWay}"
+                                                       Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                            <TextBlock Text="粉丝"
+                                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                        </StackPanel>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{x:Bind ViewModel.FavoritedCountText, Mode=OneWay}"
+                                                       Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                            <TextBlock Text="获赞"
+                                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal"
+                                                Spacing="24"
+                                                Visibility="{x:Bind ViewModel.StatsEntryVisibility, Mode=OneWay}">
+                                        <HyperlinkButton Padding="0"
+                                                         MinHeight="0"
+                                                         FontSize="14"
+                                                         FontWeight="SemiBold"
+                                                         Click="OnFollowingListClick">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{x:Bind ViewModel.FollowCountText, Mode=OneWay}"
+                                                           Style="{StaticResource BodyStrongTextBlockStyle}"
+                                                           Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                                <TextBlock Text="关注"
+                                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                            </StackPanel>
+                                        </HyperlinkButton>
+                                        <HyperlinkButton Padding="0"
+                                                         MinHeight="0"
+                                                         FontSize="14"
+                                                         FontWeight="SemiBold"
+                                                         Click="OnFollowersListClick">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{x:Bind ViewModel.FollowerCountText, Mode=OneWay}"
+                                                           Style="{StaticResource BodyStrongTextBlockStyle}"
+                                                           Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                                <TextBlock Text="粉丝"
+                                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                            </StackPanel>
+                                        </HyperlinkButton>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{x:Bind ViewModel.FavoritedCountText, Mode=OneWay}"
+                                                       Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                            <TextBlock Text="获赞"
+                                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- 简介：默认 3 行 + 「更多」；点开不限行，按钮文案跟着翻 -->
+                                <TextBlock Text="{x:Bind ViewModel.SignatureText, Mode=OneWay}"
+                                           Style="{StaticResource BodyTextBlockStyle}"
+                                           MaxLines="{x:Bind ViewModel.SignatureMaxLines, Mode=OneWay}"
+                                           TextWrapping="Wrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           Visibility="{x:Bind ViewModel.SignatureVisibility, Mode=OneWay}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <HyperlinkButton Content="{x:Bind ViewModel.SignatureToggleLabel, Mode=OneWay}"
+                                                 Visibility="{x:Bind ViewModel.SignatureToggleVisibility, Mode=OneWay}"
+                                                 Padding="0"
+                                                 MinHeight="0"
+                                                 FontSize="12"
+                                                 Click="OnSignatureToggle" />
+                            </StackPanel>
+
+                            <!-- 操作：分享主页 + 关注/已关注。关注走实测过的 commit/follow/user；
+                                 尺寸、圆角、悬停/焦点全部交回系统 Button，不再钉 33/88/12。 -->
+                            <StackPanel x:Name="ActionsPanel"
+                                        Grid.Row="0"
+                                        Grid.Column="2"
+                                        Orientation="Horizontal"
+                                        Spacing="8"
+                                        VerticalAlignment="Top">
+                                <Button Content="分享主页" Click="OnShareClick" />
+                                <Button Style="{StaticResource AccentButtonStyle}"
+                                        Content="关注"
+                                        Click="OnFollowClick"
+                                        Visibility="{x:Bind ViewModel.FollowButtonVisibility, Mode=OneWay}" />
+                                <Button Content="已关注"
+                                        Click="OnFollowClick"
+                                        ToolTipService.ToolTip="再点一次取消关注"
+                                        Visibility="{x:Bind ViewModel.FollowingButtonVisibility, Mode=OneWay}" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <!-- 本机使用热力图：**单独一张卡**（2026-10-21 口述"不太行，改为之前分离的"——
+                     塞进资料卡那一版作废，资料卡回到"横幅 + 资料区"两行）。
+                     只有本人「账号」页亮——数据是本机那本观看账本（每天累计播了多久），
+                     不是作品发布量，也不是账号侧的播放/点赞（那些拿不到按天的流水）。
+                     一年一档，格子 tooltip 给日期与时长。
+                     2026-10-22 口述定形（原话）："改成固定大小，用之前的大小；最右边是最新的，也就是当天的；
+                     未来的不造格子，过去的可造；整个热力图右对齐；左边空缺的继续用过去的事格子填充；
+                     超过一年就在热力图上面写上对应年份；右上角 combobox 选择年份仍保留"。
+                     落到这一版：<b>格子固定 16 DIP、不随面板缩放</b>，右端钉在"这一天以里最近的那个真日子"
+                     （选今年就是今天，选往年就是那年的 12/31），未来的日子不占格；
+                     <b>画几列由这张卡的实测宽度给</b>（下面那台 Grid 的 SizeChanged 报给 ViewModel），
+                     窗口拉宽 → 左边不留空缺，多出来的列继续往左吃更早的真日子（会跨年，跨年就在上面那行写年份），
+                     而且<b>不设左边界</b>（2026-10-22 口述：超宽窗口里也照宽度铺满，原来的 160 列封顶会左边空一大截）；
+                     上面的年份行<b>常亮</b>（同日口述"即使视图内只有一年，也要显示年份"），
+                     月份行每月 1 号照报、1 月不让位（同日口述"少了 1 月的显示"）；
+                     年份选项到今年为止，不列未来（同日口述"选择年份不能选择未来"）。
+                     一列就是"往前数七天"，最后一列不满七天也照画，所以条带不再要求每列从周日起。 -->
+                <Border Margin="0,12,0,0"
+                        Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{ThemeResource OverlayCornerRadius}"
+                        Visibility="{x:Bind ViewModel.HeatmapVisibility, Mode=OneWay}">
+                    <!-- 卡里用 Grid 分行：行与行各占一段，行距用各段自己的 Margin 顶出来。
+                         这台 Grid 兼任"量宽的那把尺"——SizeChanged 把实测宽报给 Heatmap.SetAvailableWidth，
+                         VM 换算成"往左画几周"（格子固定大小，宽度只决定画几天，不决定格子多大）。
+                         列数没变时 VM 那头发的是空转，拖窗沿不会重排格子。 -->
+                    <Grid x:Name="HeatmapRoot" SizeChanged="OnHeatmapSizeChanged">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <!-- 0 卡头（标题 + 右上角年份选项） -->
+                            <RowDefinition Height="Auto" />
+                            <!-- 1 年份一行：只在条带跨到选定那一年之外时才亮 -->
+                            <RowDefinition Height="Auto" />
+                            <!-- 2 格子（七行 × 列数） -->
+                            <RowDefinition Height="Auto" />
+                            <!-- 3 月份一行 -->
+                            <RowDefinition Height="Auto" />
+                            <!-- 4 汇总 + 图例 -->
+                            <RowDefinition Height="Auto" />
+                            <!-- 5 说明 -->
+                        </Grid.RowDefinitions>
+
+                        <!-- 卡头：左边标题与副标题，右边年份选项（WinUI 3 系统 ComboBox，
+                             候选与当前年都来自 Heatmap：最早那笔到今年为止，不列未来）。
+                             选年份走 SelectionChanged → ViewModel.SelectYear：
+                             不拿 x:Bind TwoWay 去顶 SelectedItem，免得程序改选与用户点选互相打转。 -->
+                        <Grid Grid.Row="0" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                <TextBlock Text="使用热力图"
+                                           Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                <TextBlock Text="本机每日观看时长（按年查看）"
+                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+
+                            <ComboBox x:Name="HeatmapYearBox"
+                                      Grid.Column="1"
+                                      MinWidth="96"
+                                      VerticalAlignment="Center"
+                                      AutomationProperties.Name="选择年份"
+                                      ItemsSource="{x:Bind ViewModel.Heatmap.Years, Mode=OneWay}"
+                                      SelectedIndex="{x:Bind ViewModel.Heatmap.YearIndex, Mode=OneWay}"
+                                      SelectionChanged="OnHeatmapYearSelected" />
+                        </Grid>
+
+                        <!-- 形态（第九十八轮按用户口述定形：固定大小 + 右对齐，不再缩放铺满）：
+                             **独立一张卡 + 三台 ItemsRepeater**（年份一行、格子七行、月份一行）。
+
+                             格子那台的朝向口径（**第九十九轮 F5 实测定死，包里文档是反的**）：
+                             <b>Horizontal = 一行放满再往下一行，Vertical = 一列放满再往右一列</b>——
+                             与 StackLayout 同读法。上一版按 Microsoft.WinUI.xml:29690 那句
+                             "maximum number of items per row (for Vertical) or column (for Horizontal)"
+                             选了 <c>Horizontal + MaximumRowsOrColumns=7</c>，F5 出来是
+                             7 列宽 × 53 行的高塔（用户截图"现在热力图成竖向的了"）：
+                             Horizontal 把 7 个排成一行就往下折，文档那句与实现相反，别再信它。
+                             所以格子那台用 <c>Orientation=Vertical + MaximumRowsOrColumns=7</c>，
+                             配 VM 的<b>列优先</b>数据（一天接一天、七天一列）——只有"列优先 + 一列限七天"
+                             容得下最后一列不满七天；一列的高度是 7×16+6×4=136，竖向可用高是无限
+                             （页面 ScrollViewer 竖向给的是 ∞），额度不会被高度卡住。
+
+                             标签两台不走 UniformGridLayout，走 <c>StackLayout Orientation=Horizontal Spacing=4</c>：
+                              wrap 布局自己还会按可用宽算"一行放几枚"，那把尺与 VM 算列数那把尺是两把尺，
+                             差一个 DIP 就把月份/年份挤成第二行、整行错位（实测口径拿不到，不赌）。
+                             StackLayout 不 wrap，一枚接一枚往右排，档距就等于"画布宽 16 + Spacing 4"这一个式子，
+                             与格子那台的 20 DIP 完全同源——这才是三台对得齐的凭据。
+                             标签画布写死 <c>Width=16 Height=16</c>（Canvas 自己量出来是 0，不写死就没档距），
+                             里面的 TextBlock 照样走出画布（Canvas 不剪孩子），"10月"那种三字标签不会丢尾。
+
+                             大小：<c>ItemsStretch=None</c>（本包 Microsoft.WinUI.xml:29762 那句
+                             "The item retains its natural size"），格子模板里 <c>Width/Height</c> 写死 16——
+                             就是最初那版（aafb279，Viewbox 里面那颗 Border）的尺寸。上一版的
+                             <c>ItemsStretch=Uniform</c> 会把格子按可用宽等比放大，用户点的正是这一点：
+                             "现在是自动缩放填充面板，改成固定大小"。
+                             宽度那侧现在只剩一个用途：<b>决定画几列</b>。列数由这台 Grid 的 SizeChanged
+                             报给 VM（<c>SetAvailableWidth</c>，取 <c>宽度/20</c> 向下取整），三台 repeater 都写
+                             <c>Width=ViewModel.Heatmap.StripWidth</c>（列数 × 20 − 4）再 <c>HorizontalAlignment=Right</c>：
+                             repeater 得有确定宽，右对齐才有东西可对齐——只写 HorizontalAlignment 不算，
+                             横向滚的那台量到的宽会被可用宽夹住（铺满整格），条带反而贴左、空缺跑到右边。
+                             StripWidth 是列数算出来的，永远不大于可用宽，顶不出横向滚动条；
+                             <b>还没量到宽时一格都不建</b>（VM 报 0 列、StripWidth=0），
+                             免得先按整年铺 1036 DIP 那一发溢出到卡片描边外面。
+
+                             为什么不走 Viewbox：那颗 0xC0000005 已实测"Viewbox 与这台 repeater 同树就炸，
+                             与旁边有没有第二台并排 repeater 无关"——只剩一台时换回 Viewbox 照样崩
+                             （第八十九轮四步 + 第九十四轮这一步，都是确定结果）。
+                             **没有新证据别再第三次试 Viewbox**。
+                             要退"定尺寸 + 定高横向 ScrollView"那条随时退得回去：实测记 HANDOVER 第九十轮
+                             与仓库笔记第 50、51 条（ScrollView≠ScrollViewer、
+                             ScrollingScrollBarVisibility 没有 Disabled 会吃 WMC0055、ContentOrientation 才是量尺开关、
+                             视口高必须有源）。
+
+                             年份那一行（2026-10-22 口述"即使视图内只有一年，也要显示年份"）：
+                             <b>常亮</b>，不再按"条带是否跨年"收放。摆法照官方——年份压在各年的开头：
+                             <b>最左那一列</b>报它第一天所在的年，
+                             之后哪一列里撞上 1 月 1 号就在那列报那一年（列是"往前数七天"，年界多半落在某一列中途）。
+                             月份行随之改回每月 1 号照报（同日口述"少了 1 月的显示"），
+                             1 月不再让位给年份行——年份在上面、月份在下面，两行各说各的。
+
+                             标签包在 Canvas 里：Canvas 给孩子无限测量空间、自己又不剪，TextBlock 才按自然宽
+                             走出自己那格（官方那种走字）。直接摆会被剪半个字——剪它的不是父容器，
+                             是 TextBlock 自己按 arrange 宽剪（2026-10-21 实测"10月/12月"丢尾）。
+                             再早那版"标签单独一行 + 每枚前面垫一段空白"更糟：额度按 60 DIP 记、字实际只有 30 上下，
+                             一枚偏一点累积下来月份就落错列。 -->
+                        <ItemsRepeater Grid.Row="1"
+                                       Width="{x:Bind ViewModel.Heatmap.StripWidth, Mode=OneWay}"
+                                       Margin="0,10,0,0"
+                                       HorizontalAlignment="Right"
+                                       ItemsSource="{x:Bind ViewModel.Heatmap.YearLabels, Mode=OneWay}">
+                            <ItemsRepeater.Layout>
+                                <!-- 一枚接一枚往右排，档距 = 画布 16 + Spacing 4 = 20，与格子那台同源。 -->
+                                <StackLayout Orientation="Horizontal" Spacing="4" />
+                            </ItemsRepeater.Layout>
+                            <ItemsRepeater.ItemTemplate>
+                                <DataTemplate x:DataType="vm:UsageHeatmapYearLabel">
+                                    <Canvas Width="16" Height="16">
+                                        <TextBlock Canvas.Left="0"
+                                                   Canvas.Top="0"
+                                                   Text="{x:Bind Text}"
+                                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </Canvas>
+                                </DataTemplate>
+                            </ItemsRepeater.ItemTemplate>
+                        </ItemsRepeater>
+
+                        <ItemsRepeater Grid.Row="2"
+                                       Width="{x:Bind ViewModel.Heatmap.StripWidth, Mode=OneWay}"
+                                       Margin="0,6,0,0"
+                                       HorizontalAlignment="Right"
+                                       ItemsSource="{x:Bind ViewModel.Heatmap.Days, Mode=OneWay}">
+                            <ItemsRepeater.Layout>
+                                <!-- 一列放满七天再往右换列（Orientation=Vertical + Max=7，第九十九轮实测：
+                                     Horizontal 是"一行放满"，会折成高塔；Vertical 才是"一列放满"），
+                                     配的正是 VM 的列优先数据；最后一列不满七天也只是那列短一截。
+                                     列数不进这里——宽度只决定"画几天"，格子本身固定 16。 -->
+                                <UniformGridLayout Orientation="Vertical"
+                                                   MaximumRowsOrColumns="7"
+                                                   MinItemWidth="16"
+                                                   MinItemHeight="16"
+                                                   MinRowSpacing="4"
+                                                   MinColumnSpacing="4"
+                                                   ItemsStretch="None" />
+                            </ItemsRepeater.Layout>
+                            <ItemsRepeater.ItemTemplate>
+                                <DataTemplate x:DataType="vm:UsageHeatmapDay">
+                                    <!-- 底下那层中性灰是"这天没看"，有记录才在上面叠一层 Windows 强调色，
+                                         浓淡由每格的 FillOpacity 报（0.25/0.5/0.75/1）。两层都走 ThemeResource：
+                                         换明暗主题、换用户自己挑的强调色，这张图一行代码都不用重算。
+                                         宽高写死 16：这就是"用之前的大小"那颗 Border 的尺寸。 -->
+                                    <Border Width="16"
+                                            Height="16"
+                                            CornerRadius="3"
+                                            Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                            ToolTipService.ToolTip="{x:Bind Tooltip}">
+                                        <Border CornerRadius="3"
+                                                Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                                Opacity="{x:Bind FillOpacity}" />
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsRepeater.ItemTemplate>
+                        </ItemsRepeater>
+
+                        <ItemsRepeater Grid.Row="3"
+                                       Width="{x:Bind ViewModel.Heatmap.StripWidth, Mode=OneWay}"
+                                       Margin="0,6,0,0"
+                                       HorizontalAlignment="Right"
+                                       ItemsSource="{x:Bind ViewModel.Heatmap.MonthLabels, Mode=OneWay}">
+                            <ItemsRepeater.Layout>
+                                <!-- 与年份那台同一条式子：画布 16 + Spacing 4 = 20 档距，一格对一格。 -->
+                                <StackLayout Orientation="Horizontal" Spacing="4" />
+                            </ItemsRepeater.Layout>
+                            <ItemsRepeater.ItemTemplate>
+                                <DataTemplate x:DataType="vm:UsageHeatmapMonthLabel">
+                                    <!-- 画布写死 16 宽（Canvas 自己量出来是 0，不写死就没档距）；
+                                         标签仍包在 Canvas 里才能走出自己那格
+                                         （TextBlock 会按 arrange 宽自剪半个字，见仓库笔记第 53 条）。 -->
+                                    <Canvas Width="16" Height="16">
+                                        <TextBlock Canvas.Left="0"
+                                                   Canvas.Top="0"
+                                                   Text="{x:Bind Text}"
+                                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </Canvas>
+                                </DataTemplate>
+                            </ItemsRepeater.ItemTemplate>
+                        </ItemsRepeater>
+
+                        <Grid Grid.Row="4"
+                              Margin="0,10,0,0"
+                              ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="{x:Bind ViewModel.Heatmap.Summary, Mode=OneWay}"
+                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center" />
+
+                            <!-- 图例：少 → 多；不写具体档位，时长在每格 tooltip 里 -->
+                            <StackPanel Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        Spacing="3"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="少"
+                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                           VerticalAlignment="Center" />
+                                <Border Width="12" Height="12" CornerRadius="2" Background="{ThemeResource ControlFillColorSecondaryBrush}" />
+                                <Border Width="12" Height="12" CornerRadius="2" Background="{ThemeResource AccentFillColorDefaultBrush}" Opacity="0.25" />
+                                <Border Width="12" Height="12" CornerRadius="2" Background="{ThemeResource AccentFillColorDefaultBrush}" Opacity="0.5" />
+                                <Border Width="12" Height="12" CornerRadius="2" Background="{ThemeResource AccentFillColorDefaultBrush}" Opacity="0.75" />
+                                <Border Width="12" Height="12" CornerRadius="2" Background="{ThemeResource AccentFillColorDefaultBrush}" />
+                                <TextBlock Text="多"
+                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Grid.Row="5"
+                                   Margin="0,10,0,0"
+                                   Text="{x:Bind ViewModel.Heatmap.Note, Mode=OneWay}"
+                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Visibility="{x:Bind ViewModel.Heatmap.NoteVisibility, Mode=OneWay}" />
+                    </Grid>
+                </Border>
+
+                <!-- 一级页签：作品（带计数）/ 推荐 / 喜欢；本人页再多两枚只读自己账号的档 -->
+                <SelectorBar x:Name="TabsBar"
+                             Margin="0,4,0,0"
+                             SelectionChanged="OnTabChanged">
+                    <SelectorBarItem x:Name="WorksTabItem" Text="{x:Bind ViewModel.WorksHeaderLine, Mode=OneWay}" />
+                    <SelectorBarItem x:Name="RecommendTabItem" Text="推荐" />
+                    <SelectorBarItem x:Name="LikesTabItem" Text="喜欢" />
+                    <!-- 只有自己的页面摆：collects/* 与 history/read 读的都是本账号，他人主页没有这两档 -->
+                    <SelectorBarItem x:Name="FavoriteTabItem"
+                                     Text="收藏"
+                                     Visibility="{x:Bind ViewModel.SelfOnlyTabVisibility, Mode=OneWay}" />
+                    <SelectorBarItem x:Name="HistoryTabItem"
+                                     Text="观看历史"
+                                     Visibility="{x:Bind ViewModel.SelfOnlyTabVisibility, Mode=OneWay}" />
+                </SelectorBar>
+
+                <!-- 二级页签只在「作品」下出现；合集/短剧按资料的 is_mix_user / is_series_user 决定摆不摆 -->
+                <SelectorBar x:Name="SectionsBar"
+                             Visibility="{x:Bind ViewModel.IsWorksTab, Mode=OneWay}"
+                             SelectionChanged="OnSectionChanged">
+                    <SelectorBarItem x:Name="PostsSectionItem" Text="作品" />
+                    <SelectorBarItem x:Name="MixSectionItem"
+                                      Text="合集"
+                                      Visibility="{x:Bind ViewModel.MixSectionVisibility, Mode=OneWay}" />
+                    <SelectorBarItem x:Name="SeriesSectionItem"
+                                     Text="短剧"
+                                     Visibility="{x:Bind ViewModel.SeriesSectionVisibility, Mode=OneWay}" />
+                </SelectorBar>
+
+                <!-- 收藏下的二级页签：官方五档全摆，端点都实测过
+                     （collects/list、aweme/listcollection、music/listcollection、mix/listcollection、series/collections）。 -->
+                <SelectorBar x:Name="FavoriteSectionsBar"
+                             Visibility="{x:Bind ViewModel.FavoriteSectionsVisibility, Mode=OneWay}"
+                             SelectionChanged="OnFavoriteSectionChanged">
+                    <SelectorBarItem x:Name="FoldersSectionItem" Text="收藏夹" />
+                    <SelectorBarItem x:Name="FavoriteVideosSectionItem" Text="视频" />
+                    <SelectorBarItem x:Name="FavoriteMusicSectionItem" Text="音乐" />
+                    <SelectorBarItem x:Name="FavoriteCompilationSectionItem" Text="合集" />
+                    <SelectorBarItem x:Name="FavoritePlayletSectionItem" Text="短剧" />
+                </SelectorBar>
+
+                <!-- 点开某个收藏夹后的夹头：返回 + 夹名 + 条数（照官方夹内页那一行） -->
+                <Grid Margin="0,8,0,0"
+                      ColumnSpacing="12"
+                      Visibility="{x:Bind ViewModel.FolderHeaderVisibility, Mode=OneWay}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button Click="OnFolderBackClick"
+                            AutomationProperties.Name="返回收藏夹"
+                            ToolTipService.ToolTip="返回收藏夹"
+                            VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE72B;" FontSize="16" />
+                    </Button>
+
+                    <TextBlock Grid.Column="1"
+                               Text="{x:Bind ViewModel.OpenedFolderName, Mode=OneWay}"
+                               Style="{StaticResource BodyStrongTextBlockStyle}"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+
+                    <TextBlock Grid.Column="2"
+                               Text="{x:Bind ViewModel.OpenedFolderCountText, Mode=OneWay}"
+                               Style="{StaticResource CaptionTextBlockStyle}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               VerticalAlignment="Center" />
+                </Grid>
+
+                <Grid Margin="0,8,0,0">
+                    <!-- 空档占位：这一档取回来了却一条都没有，就在列表原位摆一行说清为什么是空的。
+                         不摆的话整块列表区一片空白，看着像还没加载出来（文案跟着账面派生，见 EmptyHintText）。 -->
+                    <Border Height="48"
+                            VerticalAlignment="Top"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="{ThemeResource ControlCornerRadius}"
+                            Visibility="{x:Bind ViewModel.EmptyHintVisibility, Mode=OneWay}">
+                        <TextBlock Text="{x:Bind ViewModel.EmptyHintText, Mode=OneWay}"
+                                   Style="{StaticResource BodyTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                    </Border>
+                    <!-- 作品 / 喜欢：竖封面。原来压在封面上的点赞数移到卡底信息区，封面只留置顶/图文角标，
+                         卡面更接近系统媒体列表。MinItemWidth 218 → 封面 291（≈3:4）。
+                         ItemsSource 必须 Mode=OneWay：ViewModel.Posts 是"按当前档现取集合实例"的计算属性
+                         （作品/喜欢/历史/收藏/夹内各一份账），OneTime 只在加载那一刻绑一次，
+                         换页签就还挂着作品那份集合——表现就是喜欢、收藏视频、夹内全都"读不到"。 -->
+                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.Posts, Mode=OneWay}"
+                                   Visibility="{x:Bind ViewModel.PostsViewVisibility, Mode=OneWay}">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="218"
+                                               MinColumnSpacing="12"
+                                               MinRowSpacing="16"
+                                               ItemsStretch="Fill" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="vm:UserProfilePostRow">
+                                <Button Style="{StaticResource ProfileCardButtonStyle}"
+                                        Tag="{x:Bind Id}"
+                                        Click="OnPostClick">
+                                    <!-- 右键只放对象操作（复制链接 / 浏览器打开 / 复制 ID），不复刻底栏的播放与互动 -->
+                                    <Button.ContextFlyout>
+                                        <MenuFlyout>
+                                            <MenuFlyoutItem Text="复制链接"
+                                                            Tag="{x:Bind Id}"
+                                                            Click="OnCopyVideoLink" />
+                                            <MenuFlyoutItem Text="在浏览器打开"
+                                                            Tag="{x:Bind Id}"
+                                                            Click="OnOpenVideoInBrowser" />
+                                            <MenuFlyoutItem Text="复制作品 ID"
+                                                            Tag="{x:Bind Id}"
+                                                            Click="OnCopyVideoId" />
+                                        </MenuFlyout>
+                                    </Button.ContextFlyout>
+                                    <StackPanel>
+                                        <!-- 封面收在卡内 4px：卡外圆角 8、里层 4，同心；卡面与描边在四周露出一圈 -->
+                                        <Border Height="291"
+                                                Margin="4,4,4,0"
+                                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                                CornerRadius="{ThemeResource ControlCornerRadius}">
+                                            <Grid>
+                                                <Image Source="{x:Bind Cover}" Stretch="UniformToFill" />
+
+                                                <!-- 置顶角标：实测 aweme/post 前三条 is_top=1，官方把它放封面左上 -->
+                                                <Border Height="20"
+                                                        Padding="6,0"
+                                                        Margin="8,8,0,0"
+                                                        HorizontalAlignment="Left"
+                                                        VerticalAlignment="Top"
+                                                        Background="{StaticResource ProfileMediaBadgeBrush}"
+                                                        CornerRadius="{ThemeResource ControlCornerRadius}"
+                                                        Visibility="{x:Bind PinnedVisibility}">
+                                                    <TextBlock Text="置顶"
+                                                               Style="{StaticResource CaptionTextBlockStyle}"
+                                                               Foreground="{StaticResource ProfileMediaBadgeTextBrush}"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+
+                                                <!-- 图文帖标放右上，免得跟置顶抢位置 -->
+                                                <Border Height="20"
+                                                        Padding="6,0"
+                                                        Margin="0,8,8,0"
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Top"
+                                                        Background="{StaticResource ProfileMediaBadgeBrush}"
+                                                        CornerRadius="{ThemeResource ControlCornerRadius}"
+                                                        Visibility="{x:Bind ImageBadgeVisibility}">
+                                                    <TextBlock Text="图文"
+                                                               Style="{StaticResource CaptionTextBlockStyle}"
+                                                               Foreground="{StaticResource ProfileMediaBadgeTextBrush}"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+
+                                                <!-- 右下时长（回包 video.duration，毫秒）；图文帖没有这一项 -->
+                                                <Border Height="20"
+                                                        Padding="6,0"
+                                                        Margin="0,0,8,8"
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Bottom"
+                                                        Background="{StaticResource ProfileMediaBadgeBrush}"
+                                                        CornerRadius="{ThemeResource ControlCornerRadius}"
+                                                        Visibility="{x:Bind DurationVisibility}">
+                                                    <TextBlock Text="{x:Bind DurationText}"
+                                                               Style="{StaticResource CaptionTextBlockStyle}"
+                                                               Foreground="{StaticResource ProfileMediaBadgeTextBrush}"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+
+                                        <StackPanel Padding="12" Spacing="6">
+                                            <!-- 标题这格高度钉死两行（14 字 · 行高 22.4 → 45）：
+                                                 UniformGridLayout 的"统一格高"是按实测那一刻的内容算的，
+                                                 描述位图/文案晚到一步，格高就按一行甚至零行定下来，
+                                                 卡片底下那行点赞数被裁掉半截（截图实测少 33 DIP）。
+                                                 钉住之后每张卡想要的宽高都与内容无关，量几次都是同一个数。 -->
+                                            <TextBlock Text="{x:Bind Desc}"
+                                                       Height="45"
+                                                       Style="{StaticResource BodyTextBlockStyle}"
+                                                       MaxLines="2"
+                                                       TextWrapping="Wrap"
+                                                       TextTrimming="CharacterEllipsis" />
+
+                                            <!-- 卡上那个数实测是点赞（203.9万 ↔ digg_count=2038849），不是播放数；
+                                                 右侧补发布日期（create_time），与点赞同一行，行高钉死 20 -->
+                                            <Grid Height="20">
+                                                <StackPanel Orientation="Horizontal"
+                                                            Spacing="6"
+                                                            HorizontalAlignment="Left">
+                                                    <FontIcon FontSize="14"
+                                                              Glyph="&#xEB51;"
+                                                              Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                              VerticalAlignment="Center" />
+                                                    <TextBlock Text="{x:Bind LikeText}"
+                                                               Style="{StaticResource CaptionTextBlockStyle}"
+                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                               VerticalAlignment="Center" />
+                                                </StackPanel>
+
+                                                <TextBlock Text="{x:Bind PublishedText}"
+                                                           HorizontalAlignment="Right"
+                                                           VerticalAlignment="Center"
+                                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                           Visibility="{x:Bind PublishedVisibility}" />
+                                            </Grid>
+
+                                            <!-- 观看历史档多一行"什么时候看过"（aweme_date，不是发布时间）；作品/喜欢两档收起 -->
+                                            <StackPanel Orientation="Horizontal"
+                                                        Height="20"
+                                                        Spacing="6"
+                                                        Visibility="{x:Bind WatchedAtVisibility}">
+                                                <FontIcon FontSize="14"
+                                                          Glyph="&#xE81C;"
+                                                          Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                          VerticalAlignment="Center" />
+                                                <TextBlock Text="{x:Bind WatchedAtText}"
+                                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+
+                    <!-- 合集 / 短剧：同一张竖封面卡；集数与热度都在卡底信息区。主页「作品→合集/短剧」与
+                         收藏「合集/短剧」两档共用这张（回包数组键同形，只是端点与 count 不同）。
+                         合集点开照官方落到第一集视频页（官方 /collection/{id}/1 实测 302 到 /video/{第一集id}），
+                         上下文带整页集数供滚轮前后切；短剧内容端点还没验，点了只提示。 -->
+                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.Mixes, Mode=OneWay}"
+                                   Visibility="{x:Bind ViewModel.MixViewVisibility, Mode=OneWay}">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="218"
+                                               MinColumnSpacing="12"
+                                               MinRowSpacing="16"
+                                               ItemsStretch="Fill" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="vm:UserProfileMixRow">
+                                <Button Style="{StaticResource ProfileCardButtonStyle}"
+                                        Tag="{x:Bind Id}"
+                                        Click="OnMixClick">
+                                    <StackPanel>
+                                        <Border Height="291"
+                                                Margin="4,4,4,0"
+                                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                                CornerRadius="{ThemeResource ControlCornerRadius}">
+                                            <Grid>
+                                                <Image Source="{x:Bind Cover}" Stretch="UniformToFill" />
+                                                <Border Height="20"
+                                                        Padding="6,0"
+                                                        Margin="0,8,8,0"
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Top"
+                                                        Background="{StaticResource ProfileMediaBadgeBrush}"
+                                                        CornerRadius="{ThemeResource ControlCornerRadius}">
+                                                    <TextBlock Text="{x:Bind BadgeText}"
+                                                               Style="{StaticResource CaptionTextBlockStyle}"
+                                                               Foreground="{StaticResource ProfileMediaBadgeTextBrush}"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                        <StackPanel Padding="12" Spacing="6">
+                                            <TextBlock Text="{x:Bind Name}"
+                                                       Style="{StaticResource BodyStrongTextBlockStyle}"
+                                                       MaxLines="1"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                                <TextBlock Text="{x:Bind EpisodeText}"
+                                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                           Visibility="{x:Bind EpisodeVisibility}" />
+                                                <TextBlock Text="{x:Bind HotText}"
+                                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                           Visibility="{x:Bind HotVisibility}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+
+                    <!-- 收藏 → 音乐：方封面 + 曲名 + 作者（回包 mc_list 只给这三样）。
+                         播放链没实测过（这批回包里没有可播的地址），所以卡面故意不做成按钮——只摆形状，不给动作。 -->
+                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.Musics, Mode=OneWay}"
+                                   Visibility="{x:Bind ViewModel.MusicViewVisibility, Mode=OneWay}">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="168"
+                                               MinColumnSpacing="12"
+                                               MinRowSpacing="16"
+                                               ItemsStretch="Fill" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="vm:UserProfileMusicRow">
+                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="{ThemeResource OverlayCornerRadius}">
+                                    <StackPanel>
+                                        <Border Height="168"
+                                                Margin="4,4,4,0"
+                                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                                CornerRadius="{ThemeResource ControlCornerRadius}">
+                                            <Grid>
+                                                <FontIcon Glyph="&#xE8D6;"
+                                                          FontSize="40"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <Image Source="{x:Bind Cover}" Stretch="UniformToFill" />
+                                            </Grid>
+                                        </Border>
+                                        <StackPanel Padding="12" Spacing="6">
+                                            <TextBlock Text="{x:Bind Title}"
+                                                       Style="{StaticResource BodyStrongTextBlockStyle}"
+                                                       MaxLines="1"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{x:Bind Author}"
+                                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                       MaxLines="1"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Visibility="{x:Bind AuthorVisibility}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+
+                    <!-- 收藏夹格子：一张 collects_cover 封面 + 夹名 + 条数。
+                         官方卡面上那排 5 枚小封面是页面按夹逐发 collects/video/list 拼出来的（84 夹就是 84 发），
+                         这里只用回包自带的单封面。没封面时垫一枚文件夹字形，不留黑块。 -->
+                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.CollectFolders, Mode=OneWay}"
+                                   Visibility="{x:Bind ViewModel.FolderGridVisibility, Mode=OneWay}">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="240"
+                                               MinColumnSpacing="12"
+                                               MinRowSpacing="16"
+                                               ItemsStretch="Fill" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="vm:UserProfileCollectFolderRow">
+                                <Button Style="{StaticResource ProfileCardButtonStyle}"
+                                        Tag="{x:Bind Id}"
+                                        Click="OnFolderClick">
+                                    <StackPanel>
+                                        <Border Height="160"
+                                                Margin="4,4,4,0"
+                                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                                CornerRadius="{ThemeResource ControlCornerRadius}">
+                                            <Grid>
+                                                <FontIcon Glyph="&#xE8B7;"
+                                                          FontSize="40"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <Image Source="{x:Bind Cover}" Stretch="UniformToFill" />
+                                            </Grid>
+                                        </Border>
+                                        <StackPanel Padding="12" Spacing="6">
+                                            <TextBlock Text="{x:Bind Name}"
+                                                       Style="{StaticResource BodyStrongTextBlockStyle}"
+                                                       MaxLines="1"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{x:Bind CountText}"
+                                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+
+                    <!-- 推荐档：官方在他人主页就是这一句，且实测连请求都不发，所以我们也不假装去取 -->
+                    <TextBlock Text="{x:Bind ViewModel.RecommendNotice, Mode=OneWay}"
+                               Style="{StaticResource BodyTextBlockStyle}"
+                               HorizontalAlignment="Center"
+                               Margin="0,60"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               Visibility="{x:Bind ViewModel.RecommendNoticeVisibility, Mode=OneWay}" />
+
+                    <!-- 喜欢档：资料没公开就给官方那两句（判据 show_favorite_list=false） -->
+                    <TextBlock Text="{x:Bind ViewModel.LikesNotice, Mode=OneWay}"
+                               Style="{StaticResource BodyTextBlockStyle}"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               HorizontalAlignment="Center"
+                               Margin="0,60"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               Visibility="{x:Bind ViewModel.LikesNoticeVisibility, Mode=OneWay}" />
+                </Grid>
+
+                <!-- 状态：空态、上限说明、错误都走这一行（不抢列表首屏的居中位） -->
+                <StackPanel Spacing="8" Margin="0,16,0,0">
+                    <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                               Style="{StaticResource BodyTextBlockStyle}"
+                               HorizontalAlignment="Center"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                </StackPanel>
+
+                <!-- 复制完的落地提示（没有 Toast 帮手，用一枚自己收的轻提示） -->
+                <TextBlock x:Name="TipText"
+                           Style="{StaticResource CaptionTextBlockStyle}"
+                           HorizontalAlignment="Center"
+                           Margin="0,16,0,0"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           Visibility="Collapsed" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 本人主页但未登录：整块内容收起，居中给登录闸门。资料取不回来时头部没东西可画，
+             与其停在「正在读取主页…」，不如直接说清要登录。他人主页不会亮这块。 -->
+        <Grid Grid.Row="1"
+              Visibility="{x:Bind ViewModel.SelfLoginGateVisibility, Mode=OneWay}">
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        MaxWidth="360"
+                        Spacing="12">
+                <FontIcon Glyph="&#xE77B;"
+                          FontSize="36"
+                          HorizontalAlignment="Center"
+                          Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                <TextBlock Text="登录后查看自己的账号主页"
+                           Style="{StaticResource BodyTextBlockStyle}"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Button Content="登录"
+                        Style="{StaticResource AccentButtonStyle}"
+                        HorizontalAlignment="Center"
+                        Click="OnLoginRequested" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Page>

@@ -1,0 +1,300 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>WinDouYin</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x86;x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+    <!--
+      这里原本有一行模板默认的 <PublishProfile>win-$(Platform).pubxml</PublishProfile>，已删。
+      原因实测过：有了它，SDK 在每次求值都会把那份 pubxml 当"当前档案"导进来（Build 也算），
+      档案里任何工程级属性都会漏进 F5——当时 DebugType=none 一写，Debug 直接不出 pdb，调试断点全废。
+      发布档案要靠 VS 的发布动作或 -p:PublishProfile=<名> 显式指定，才该生效。
+    -->
+    <UseWinUI>true</UseWinUI>
+    <WinUISDKReferences>false</WinUISDKReferences>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <!--
+      WASDK 分两档，由发布档案显式选择：
+      · 默认档（win-x64.pubxml）：框架依赖。本机实测已装 Windows App Runtime 2.5.1.0
+        （x64/x86 框架包 + Main 2.5.1 + Singleton），与工程引用的 Microsoft.WindowsAppSDK 2.5.1 同版本，
+        启动时由 Bootstrap.dll 激活系统运行时，发布包不带 WinUI/WASDK 原生负载。
+        目标机只需要 Windows App Runtime 2.5，不需要 .NET（AOT 已自包含）。
+        （2026-10-19 修正：此前"本机没装可再发行包、必须自包含"是过期结论——WE Tool 的 2.4 框架依赖包
+          在同一台机器上一直能跑，运行时按 2.x 兼容；这些运行时是 Microsoft Store 更新内置应用时带进来的。）
+      · 真自包含档（win-x64-selfcontained.pubxml）：把 TrimUnshippedPayload 修剪过的 WASDK 原生负载
+        随包带上，目标机两个运行时都不用装；代价是包回到约 81MB。
+    -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained Condition="'$(WindowsAppSDKSelfContained)' == ''">false</WindowsAppSDKSelfContained>
+    <!--
+      AOT/XAML 兼容开关，与 WE Tool 同口径（它们踩过 0xC000027B stowed exception）：
+      · full 裁剪下 XAML 运行时仍要按类型名解析数据模板里的模型，打开 TypeInfo 反射兜底；
+      · 关掉绑定诊断，避免诊断层在 AOT 下抛存根异常；
+      · IsAotCompatible 让 AOT/裁剪分析器在构建期就报问题；
+      · CsWinRTAotWarningLevel=2 把 CsWinRT 的 AOT 警告开到详细档。
+    -->
+    <EnableTypeInfoReflection>true</EnableTypeInfoReflection>
+    <EnableBindingDiagnostics>false</EnableBindingDiagnostics>
+    <IsAotCompatible>true</IsAotCompatible>
+    <CsWinRTAotWarningLevel>2</CsWinRTAotWarningLevel>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!--
+      打包默认就走 Native AOT：这一项必须写在工程里而不是只写在发布档案里。
+      原因是时机——发布档案(pubxml)由 SDK 在 Microsoft.NET.Sdk.BeforeCommon.targets 阶段才导入，
+      晚于工程主体的求值；而 restore 更早，VS 点"发布"时的还原并不会带上档案里的属性。
+      ILCompiler 的 targets 与运行时包都要在求值时看到 PublishAot 才会挂上，
+      只在档案里设的话会出现"命令行能过、VS 里报找不到运行时包/仍出托管 dll"。
+      要出对照用的 JIT 包：dotnet publish ... -p:PublishAot=false。
+    -->
+    <PublishAot Condition="'$(PublishAot)' == ''">true</PublishAot>
+    <!-- [ObservableProperty] public partial T X { get; set; } 的 partial property 语法依赖 -->
+    <LangVersion>preview</LangVersion>
+    <!-- 非打包应用没有包清单可声明默认语言：资源按系统显示语言解析，缺匹配时回退到该语言 -->
+    <DefaultLanguage>zh-CN</DefaultLanguage>
+    <!-- WinRT 投影器（CsWinRT）在裁剪/AOT 下要用源生成的 unsafe 指针代码把泛型 WinRT 接口
+         （List<T>、T[] 这类）过 ABI；不开它就只能走运行时 marshalling，Native AOT 下直接报
+         "Argument 'source' is not a supported vector"。见警告 CsWinRT1030。 -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!--
+    full 裁剪会按可达性删成员：ReplyCardControl 里 20 多处反射 {Binding} 落在下面两个行模型上，
+    XAML 运行时靠类型名取属性，静态分析看不见这条边，必须显式保留（WE Tool 的 TrimmerRoots.xml 同法）。
+  -->
+  <ItemGroup>
+    <TrimmerRootDescriptor Include="Properties\TrimmerRoots.xml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\SplashScreen.scale-200.png" />
+    <Content Include="Assets\LockScreenLogo.scale-200.png" />
+    <Content Include="Assets\Square150x150Logo.scale-200.png" />
+    <Content Include="Assets\Square44x44Logo.scale-200.png" />
+    <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
+    <Content Include="Assets\StoreLogo.png" />
+    <Content Include="Assets\Wide310x150Logo.scale-200.png" />
+  </ItemGroup>
+
+  <!-- 抓取规则放磁盘：抖音换接口路径时只改 patterns.json，不必改 C# 代码、不必重编译 -->
+  <ItemGroup>
+    <Content Include="Assets\bridge\**\*.*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!--
+    工程的拆法（第 106 轮，两仓共用同一份本文件）：
+      WinDouYin.Contracts  界面与取数之间的契约（开放类型 + IDouyinFeed）
+      WinDouYin.Core       两边共用的工具面（MfLog / JsonText / UsageStore）
+      WinDouYin.Douyin     取数那半；真源码只在私有仓，公开仓那边自动落空实现档（见那枚 csproj）
+    所以本工程 glob 到的只有不碰抖音服务器的那半——闭源源码已经搬出这个目录。
+    这一份文件在两个仓里逐字节相同：公开仓 clone 后 Native/Signing 那些路径不存在，
+    Bridge\** 与 Assets\bridge\** 这两段 glob 自然落空，不需要分叉。
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\WinDouYin.Contracts\WinDouYin.Contracts.csproj" />
+    <ProjectReference Include="..\WinDouYin.Core\WinDouYin.Core.csproj" />
+    <ProjectReference Include="..\WinDouYin.Douyin\WinDouYin.Douyin.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <!--
+    Defining the "Msix" ProjectCapability here allows the Single-project MSIX Packaging
+    Tools extension to be activated for this project even if the Windows App SDK Nuget
+    package has not yet been restored.
+  -->
+  <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
+    <ProjectCapability Include="Msix" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" Version="8.2.251219" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
+    <!--
+      WASDK 仍用元包：改引组件包（WinUI+Foundation+DWrite+Runtime）实测会把 BuildTools.MSIX 的
+      CustomBeforeMicrosoftCommonTargets 抢注顺序打破，构建直接报 MSIX 链校验失败。
+      瘦身不走依赖图这条路，改由下面的 TrimUnshippedPayload 在发布阶段摘文件。
+    -->
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+  </ItemGroup>
+
+  <!--
+    发布瘦身：把"随包但永不加载"的负载从发布清单里摘掉。只作用于 dotnet publish，Debug/F5 不受影响。
+    判据不是猜的——这些 dll 各自只服务一个 API 命名空间，全仓 grep 过：应用一次都没调
+    （Microsoft.Windows.AI.* / .Search / .Widgets / onnxruntime / DirectML 零引用；WinUI、MF 播放、
+     WebView2 都不依赖它们）。连同下面 AotSymbols 那条去掉 pdb 后，AOT 包 236MB → 91MB，
+     启动/播放/WebView2 登录窗实测照常。
+    要恢复：把这条 target 整段删掉即可，元包本身没动。
+  -->
+  <PropertyGroup>
+    <UnshippedPayloadRegex>^(Microsoft\.Windows\.AI\.|Microsoft\.Windows\.Search\.|Microsoft\.Windows\.Widgets\.|Microsoft\.Asg\.SemanticIndex|Microsoft\.Graphics\.Imaging|Microsoft\.Graphics\.Internal\.Imaging|Microsoft\.Graphics\.ImagingInternal|onnxruntime|onnxprotos|DirectML|PerceptiveStreaming)</UnshippedPayloadRegex>
+    <!--
+      第四十九轮逐项实测（每删一项启动一次，判据是日志跑到"心跳 4"且无"启动抛异常"）：
+      下面这 11 个组件负载摘掉后一切照常，源码里也零引用。
+      试过但**必须留**的两个：WinUIEdit.dll（TextBox 的编辑内核，删了 XamlParseException:
+      Cannot create instance of type 'Microsoft.UI.Xaml.Controls.TextBox'）、
+      Microsoft.UI.Xaml.Phone.dll（删了首帧之后卡死，心跳不再走）。
+    -->
+    <UnshippedComponentRegex>^(Microsoft\.UI\.Designer|DwmSceneI|NPUDetect|Microsoft\.Windows\.Workloads(\.Resources(_ec)?)?|PushNotificationsLongRunningTask\.ProxyStub|SessionHandleIPCProxyStub|Microsoft\.Windows\.ApplicationModel\.Background\.UniversalBGTask|Microsoft\.Graphics\.Display|RestartAgent)\.(dll|exe)$</UnshippedComponentRegex>
+    <!--
+      WASDK 自包含负载带 86 种语言的 .mui（每语言 2 个，共 172 个文件，占发布产出文件数的三分之二）。
+      本工程只有 zh-CN 资源（Strings/zh-CN），WinUI 内建字符串有 zh-CN + en-us 兜底就够；
+      其余语言在发布清单里摘掉，删了也只是那几种语言下 WinUI 自带文案回落到英文。
+    -->
+    <KeptMuiCultureRegex>[\\/](zh-CN|en-us)[\\/][^\\/]+\.mui$</KeptMuiCultureRegex>
+    <!--
+      第五十三轮自包含档模块审计：启动 + MF 播放 + 弹幕链路上，下面几个 DLL 从未被加载；
+      批量移走后首帧、心跳 6、Playing、弹幕照常，截图确认中文/搜索框/导航文字渲染完整。
+      · DWriteCore.dll：WinUI 文本走系统 DirectWrite，本应用没有直接调 WASDK DWrite API；
+      · Bootstrap.dll：自包含档走 undocked WinRT，不需要引导系统运行时——框架依赖档必须留。
+      workloads*.json 与 Workloads.pri 属于已摘的 Workloads 组件。
+      19h1/common 资源 DLL 在 Win11 未加载，但保留给目标下限 Win10 19041；
+      WebView2 在网页窗才用，保留。
+      **2026-10-20 更正**：wuceffectsi.dll 不能摘——第六十轮自包含档冒烟在 MF 起播后
+      以 0xC06D007E（延迟加载失败）退出，补回它即稳定；进程模块表实测它确实被加载
+      （DWriteCore 同次仍未加载，继续摘）。第五十三轮那条"从未加载"的判据放到今天不成立。
+    -->
+    <SelfContainedOnlyUnshippedRegex>^(DWriteCore\.dll|Microsoft\.WindowsAppRuntime\.Bootstrap\.dll|workloads(\.[^.]+)*\.json|Microsoft\.Windows\.Workloads\.pri)$</SelfContainedOnlyUnshippedRegex>
+  </PropertyGroup>
+  <Target Name="TrimUnshippedPayload" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <_PrunedPayload Include="@(ResolvedFileToPublish)"
+                      Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(Filename)%(Extension)', $(UnshippedPayloadRegex)))" />
+      <_PrunedComponents Include="@(ResolvedFileToPublish)"
+                         Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(Filename)%(Extension)', $(UnshippedComponentRegex)))" />
+      <!-- .winmd 是引用元数据：CsWinRT 投影已按可达性编进原生镜像，运行时不读元数据（38 个，实测删除后照常）；
+           map.html 是 WinUI MapControl 的离线页，本工程没有地图 -->
+      <_PrunedMetadata Include="@(ResolvedFileToPublish)"
+                       Condition="'%(Extension)' == '.winmd' or '%(Filename)%(Extension)' == 'map.html'" />
+      <_PrunedMui Include="@(ResolvedFileToPublish)"
+                  Condition="'%(Extension)' == '.mui' and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(Identity)', $(KeptMuiCultureRegex)))" />
+      <_PrunedSelfContainedOnly Include="@(ResolvedFileToPublish)"
+                                Condition="'$(WindowsAppSDKSelfContained)' == 'true' and $([System.Text.RegularExpressions.Regex]::IsMatch('%(Filename)%(Extension)', $(SelfContainedOnlyUnshippedRegex)))" />
+      <ResolvedFileToPublish Remove="@(_PrunedPayload)" />
+      <ResolvedFileToPublish Remove="@(_PrunedComponents)" />
+      <ResolvedFileToPublish Remove="@(_PrunedMetadata)" />
+      <ResolvedFileToPublish Remove="@(_PrunedMui)" />
+      <ResolvedFileToPublish Remove="@(_PrunedSelfContainedOnly)" />
+    </ItemGroup>
+    <Message Importance="high" Text="TrimUnshippedPayload：摘掉 组件负载 @(_PrunedPayload->Count()) + 未用 WASDK 组件 @(_PrunedComponents->Count()) + 元数据/map @(_PrunedMetadata->Count()) + 非中文 .mui @(_PrunedMui->Count()) + 自包含档未用 @(_PrunedSelfContainedOnly->Count())（%0A  %0A  @(_PrunedComponents->'%(Filename)%(Extension)', '%0A  ')）" />
+  </Target>
+
+  <!--
+    裁剪粒度闸门：读 ILC 实收参数（obj/.../native/*.ilc.rsp），出现 defaultrooting 说明裁剪
+    退化成 partial（被引用的第三方程序集整块编进镜像），不是成员级裁剪。改 TrimMode、
+    换依赖或升级 SDK 后先看这条有没有炸。
+  -->
+  <Target Name="AssertTrimGranularity" AfterTargets="IlcCompile" Condition="'$(PublishAot)' == 'true'">
+    <PropertyGroup>
+      <_IlcRspDir Condition="'$(NativeIntermediateOutputPath)' != ''">$(NativeIntermediateOutputPath)</_IlcRspDir>
+      <_IlcRspDir Condition="'$(_IlcRspDir)' == ''">$(IntermediateOutputPath)native\</_IlcRspDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_IlcRsp Include="$(_IlcRspDir)*.ilc.rsp" />
+      <_DefaultRooted Include="@(_IlcRsp)"
+                      Condition="$([System.IO.File]::ReadAllText('%(Identity)').Contains('defaultrooting'))" />
+    </ItemGroup>
+    <Error Condition="'@(_DefaultRooted->Count())' != '0'"
+           Text="裁剪退化成 partial：@(_DefaultRooted) 里出现 defaultrooting，第三方程序集会被整块编进镜像（体积可涨几十 MB）。检查 TrimMode 是否被改回 partial。" />
+    <Message Importance="high" Text="AssertTrimGranularity：ILC 参数无 defaultrooting，成员级裁剪生效" />
+  </Target>
+
+  <!--
+    发布闸门（各 AOT 档案声明 RequireNativeAot=true）：
+    若有人用 -p:PublishAot=false 或改了工程默认值跑发布，这里直接报错，
+    避免静默产出 coreclr + 数百个托管 DLL 的 JIT 自包含包（体积约 2-3 倍）。
+  -->
+  <Target Name="AssertNativeAotPublish" BeforeTargets="ComputeResolvedFilesToPublishList"
+          Condition="'$(RequireNativeAot)' == 'true' and '$(PublishAot)' != 'true'">
+    <Error Text="当前发布不是 Native AOT（PublishAot=$(PublishAot)）。AOT 是工程默认值；若命令行/环境显式传了 -p:PublishAot=false，请去掉——本档案只用于出 AOT 包。JIT 自包含包会多出 coreclr 与数百个托管 DLL。" />
+  </Target>
+
+  <!--
+    FileSystem 发布不会自动清空目标目录：上一轮 JIT 包（或带 pdb 的符号包）里的文件会原样残留，
+    叠加到新包上看起来像"AOT/pdb 没生效"。档案里 DeleteExistingFiles=true 时先清目录，
+    CLI/CI 与 VS 发布走同一条路径。
+    DependsOnTargets 保住顺序：先过 AOT 闸门再清目录。实测发现闸门失败时如果已经清过，
+    上一份正式包会被白白删掉。
+  -->
+  <Target Name="CleanStalePublishDir" BeforeTargets="PrepareForPublish"
+          DependsOnTargets="AssertNativeAotPublish"
+          Condition="'$(DeleteExistingFiles)' == 'true' and '$(PublishDir)' != ''">
+    <RemoveDir Directories="$(PublishDir)" />
+    <Message Importance="high" Text="CleanStalePublishDir：已清空 $(PublishDir)" />
+  </Target>
+
+  <!--
+    Defining the "HasPackageAndPublishMenuAddedByProject" property here allows the Solution
+    Explorer "Package and Publish" context menu entry to be enabled for this project even if
+    the Windows App SDK Nuget package has not yet been restored.
+  -->
+  <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
+    <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
+  </PropertyGroup>
+
+  <!-- Publish Properties -->
+  <PropertyGroup>
+    <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
+    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
+    <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
+    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
+  </PropertyGroup>
+
+  <!--
+    Native AOT 发布期口径。条件里带 _IsPublishing 是关键：PublishAot 现在是工程默认值，
+    若不加分辨会把 DebugType=none 之类带到 F5/普通构建里去，调试器就没了源关联。
+    _IsPublishing 由 dotnet publish / VS 的发布动作作为全局属性传入，普通 build 时为空。
+    三条互斥规矩是实测撞出来的：
+      · PublishAOT 与 PublishReadyToRun 二选一，R2R 必须关掉；
+      · 裁剪由 native 编译隐含，显式 -p:PublishTrimmed=false 会直接报 "cannot be disabled"；
+      · AOT 必须自包含 .NET + 指定 RID；WASDK 那层由档案选：默认框架依赖（不带 WinUI 运行时），
+        win-x64-selfcontained 档设 WindowsAppSDKSelfContained=true，带修剪后的 WASDK 原生负载。
+  -->
+  <PropertyGroup Condition="'$(PublishAOT)' == 'true' and '$(_IsPublishing)' == 'true'">
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <PublishTrimmed>true</PublishTrimmed>
+    <!--
+      显式钉死裁剪档位（此前只靠 NativeAOT 的隐含默认，工程里等于"没写"）：
+      TrimMode=full 是成员级——静态不可达的方法/类型不进镜像；partial 会把被引用但没标
+      IsTrimmable 的第三方程序集整块保留（WE Tool 实测同代码 partial/full 差出 60MB+）。
+      EnableTrimAnalyzer 打开编译期裁剪分析，配合单条警告模式定位到方法（IL2xxx）。
+      粒度闸门见下面 AssertTrimGranularity：ilc.rsp 里一旦出现 defaultrooting 直接报错。
+    -->
+    <TrimMode>full</TrimMode>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <SelfContained>true</SelfContained>
+    <!-- 裁剪分析器把整棵调用图都查一遍，警告按方法级报（不带 SingleWarn 只出一个汇总，定位不到行号） -->
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
+    <!--
+      崩溃取证靠的是托管栈上的方法名，那由 IlcGenerateStackTraceData 提供，跟原生 PDB 无关。
+      AOT 的 WinDouYin.pdb 单文件 85.8MB——占整个包三分之一，默认不进发布目录。
+      要用 WinDbg 把地址对到源码行时：dotnet publish ... -p:AotSymbols=true（或事后单独取符号）。
+    -->
+    <AotSymbols Condition="'$(AotSymbols)' == ''">false</AotSymbols>
+    <IlcGenerateStackTraceData>true</IlcGenerateStackTraceData>
+    <DebugType Condition="'$(AotSymbols)' == 'true'">portable</DebugType>
+    <DebugType Condition="'$(AotSymbols)' != 'true'">none</DebugType>
+    <DebugSymbols Condition="'$(AotSymbols)' != 'true'">false</DebugSymbols>
+    <IlcGenerateDebugInfo Condition="'$(AotSymbols)' != 'true'">false</IlcGenerateDebugInfo>
+    <!--
+      这一项才是"包里有没有 pdb"的真开关：ILCompiler 的 _CopyAotSymbols 目标在
+      CopyOutputSymbolsToPublishDirectory=true 时，会先删掉发布目录里的托管 pdb，再从
+      bin/.../native/ 里把原生符号**复制**过来——Copy 保留源文件时间戳，所以哪怕本次构建
+      压根没生成符号，上一轮遗留的 85.8MB pdb 也会被搬进新包（实测踩过：新包里的 pdb 是旧时间戳）。
+    -->
+    <CopyOutputSymbolsToPublishDirectory Condition="'$(AotSymbols)' != 'true'">false</CopyOutputSymbolsToPublishDirectory>
+    <!--
+      属性名是 OptimizationPreference；ILCompiler 的 targets 只读这个（Microsoft.NETCore.Native.targets
+      里按它选 Os / Ot 优化档）。写成 IlcOptimizationPreference 不会报错，但会被静默忽略——实测两个包字节相同。
+      正式默认 Size（Os 档 + dehydrate，exe 18.12→14.76MB）；要对照 Speed（带 PGO/MIBC）用
+      -p:OptimizationPreference=Speed 或档案覆盖。
+    -->
+    <OptimizationPreference Condition="'$(OptimizationPreference)' == ''">Size</OptimizationPreference>
+  </PropertyGroup>
+</Project>

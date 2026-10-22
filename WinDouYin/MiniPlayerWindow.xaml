@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="WinDouYin.MiniPlayerWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="小窗">
+
+    <!-- 小窗：无标题栏的一条视频 + 一条会自己隐藏的控制条。颜色一律写死，不吃系统主题，
+         免得小窗跟主窗口两套观感。画面用的是主窗口那一页的 MediaPlayer（挂过来渲染），声音与进度都不重来。 -->
+    <Grid x:Name="Root"
+          Background="#FF000000"
+          KeyboardAcceleratorPlacementMode="Hidden"
+          PointerMoved="OnRootPointerMoved"
+          PointerEntered="OnRootPointerMoved"
+          PointerExited="OnRootPointerExited">
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="Escape" Invoked="OnEscapeInvoked" />
+        </Grid.KeyboardAccelerators>
+
+        <MediaPlayerElement x:Name="Video"
+                            AreTransportControlsEnabled="False"
+                            Stretch="Uniform"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch" />
+
+        <!-- 顶条：没有标题栏了，这条是拖动区（代码里登记成窗口的 caption 区）+ 常驻的收回按钮 -->
+        <Grid x:Name="CaptionStrip" VerticalAlignment="Top" Height="30">
+            <Button x:Name="CloseButton"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Margin="0,4,6,0"
+                    Width="28"
+                    Height="24"
+                    Padding="0"
+                    Background="#66000000"
+                    BorderThickness="0"
+                    ToolTipService.ToolTip="收回主窗口"
+                    Click="OnCloseClick">
+                <FontIcon Glyph="&#xE711;" FontSize="12" Foreground="#FFFFFFFF" />
+            </Button>
+        </Grid>
+
+        <!-- 底部控制条：鼠标不动 2.5 秒自己滑下去（见 ShowChrome/HideChrome） -->
+        <Border x:Name="Bar"
+                VerticalAlignment="Bottom"
+                Margin="8,0,8,8"
+                Padding="8,2"
+                CornerRadius="6"
+                Background="#B31A1A1A"
+                Opacity="0">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="BarTransform" />
+            </Border.RenderTransform>
+
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button x:Name="PlayPauseButton"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="6"
+                        ToolTipService.ToolTip="播放/暂停"
+                        Click="OnPlayPauseClick">
+                    <FontIcon x:Name="PlayPauseIcon" FontSize="14" Glyph="&#xE769;" Foreground="#FFFFFFFF" />
+                </Button>
+
+                <TextBlock x:Name="TimeLabel"
+                           VerticalAlignment="Center"
+                           FontSize="11"
+                           Foreground="#CCFFFFFF"
+                           Text="00:00 / 00:00" />
+
+                <!-- 事件在代码里接（XAML 上的 ValueChanged 会在载入时先响一次，把播放器拽到 0） -->
+                <Slider x:Name="ProgressSlider"
+                        Width="220"
+                        Minimum="0"
+                        Maximum="1"
+                        Value="0"
+                        VerticalAlignment="Center"
+                        ToolTipService.ToolTip="进度" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

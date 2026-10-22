@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  NativeAOT 裁剪保留（WE Tool 同法）：
+  ReplyCardControl 的 20 多处反射 {Binding} 落在两个行模型上——XAML 运行时按属性名取值，
+  静态可达性分析看不到这条边，full 裁剪下会被删成 MissingMember。
+  只留这两个类型；其余 XAML 一律 x:Bind / x:DataType，靠生成的类型信息即可。
+-->
+<linker>
+  <assembly fullname="WinDouYin">
+    <type fullname="WinDouYin.ViewModels.CommentReplyRowViewModel" preserve="all" />
+    <type fullname="WinDouYin.ViewModels.CommentImageViewModel" preserve="all" />
+  </assembly>
+</linker>

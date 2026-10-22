@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinDouYin.Views.MePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:WinDouYin.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    NavigationCacheMode="Required">
+
+    <!-- 登录那一块和居中面板是同一份控件，排布等口述再改 -->
+    <StackPanel HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="12">
+        <TextBlock x:Uid="MePage_Title"
+                   HorizontalAlignment="Center" />
+        <controls:LoginPanel x:Name="LoginPanelHost" />
+    </StackPanel>
+</Page>

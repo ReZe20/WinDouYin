@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinDouYin.Views.FeaturedPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:WinDouYin.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:WinDouYin.ViewModels"
+    mc:Ignorable="d"
+    NavigationCacheMode="Required"
+    Unloaded="OnPageUnloaded">
+
+    <!--
+        精选页（官方 douyin.com/jingxuan，2026-10-21 实抓口径）：
+        分类条 + 卡片网格；≥1536 视口首卡占 3 列 × 2 行（标题/作者压在封面上），右侧竖排两枚小卡。
+        卡片信息照官方：时长/点赞压封面，标题两行，作者行带「你的关注」；悬停静音起播 + 2px 进度条。
+    -->
+    <Page.Resources>
+        <!-- 卡面不是"设置卡"：官方是无底无边、封面自带圆角；这里只去掉 Button 的默认内边距，
+             悬停/按下的底色仍交回系统（ControlFill 那套），不手搓颜色。 -->
+        <Style x:Key="FeaturedCardStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="12" />
+        </Style>
+
+        <Style x:Key="FeaturedMoreStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+    </Page.Resources>
+
+    <Grid x:Name="Root">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 17 枚分类：官方顺序与 tag_id 在 FeaturedViewModel.CategoryTable，代码里灌进来 -->
+        <SelectorBar x:Name="CategoryBar"
+                     Grid.Row="0"
+                     Margin="24,6,30,0"
+                     SelectionChanged="OnCategoryChanged" />
+
+        <Grid x:Name="PreviewHost" Grid.Row="1">
+            <ScrollViewer x:Name="FeedScroll"
+                          Padding="12,10,30,24"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          ViewChanged="OnFeedScrollChanged">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <ItemsRepeater x:Name="FeaturedRepeater"
+                                   Grid.Row="0"
+                                   ItemsSource="{x:Bind ViewModel.Items}"
+                                   ElementPrepared="OnElementPrepared">
+                        <ItemsRepeater.Layout>
+                            <controls:FeaturedGridLayout />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FeaturedRow">
+                                <Grid PointerEntered="OnCardPointerEntered"
+                                      PointerExited="OnCardPointerExited">
+                                    <Button Style="{StaticResource FeaturedCardStyle}"
+                                            Tag="{x:Bind Id}"
+                                            Click="OnCardClick"
+                                            AutomationProperties.Name="{x:Bind Title}">
+                                        <Button.ContextFlyout>
+                                            <!-- 右键只放对象操作，不复刻底栏的播放/点赞 -->
+                                            <MenuFlyout>
+                                                <MenuFlyoutItem Text="复制链接"
+                                                                Tag="{x:Bind Id}"
+                                                                Click="OnCopyVideoLink" />
+                                                <MenuFlyoutItem Text="在浏览器打开"
+                                                                Tag="{x:Bind Id}"
+                                                                Click="OnOpenVideoInBrowser" />
+                                                <MenuFlyoutItem Text="复制作品 ID"
+                                                                Tag="{x:Bind Id}"
+                                                                Click="OnCopyVideoId" />
+                                            </MenuFlyout>
+                                        </Button.ContextFlyout>
+
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+
+                                            <Border x:Name="CoverBox"
+                                                    Grid.Row="0"
+                                                    Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                                    CornerRadius="12">
+                                                <controls:AspectRatioPanel>
+                                                    <Grid>
+                                                        <Image Source="{x:Bind Cover}"
+                                                               Stretch="UniformToFill"
+                                                               AutomationProperties.Name="{x:Bind Title}" />
+
+                                                        <!-- 大卡的播放层：代码在首卡实现后把共享预览控件塞进来（在封面之上、文字之下） -->
+                                                        <Grid x:Name="HeroMediaHost"
+                                                              Visibility="{x:Bind HeroVisibility, Mode=OneWay}"
+                                                              IsHitTestVisible="False" />
+
+                                                        <!-- 小卡 48px 渐隐：压住时长/点赞，和官方一致 -->
+                                                        <Border Height="48"
+                                                                VerticalAlignment="Bottom"
+                                                                Visibility="{x:Bind SmallVisibility, Mode=OneWay}">
+                                                            <Border.Background>
+                                                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                                    <GradientStop Offset="0" Color="#00000000" />
+                                                                    <GradientStop Offset="1" Color="#8C000000" />
+                                                                </LinearGradientBrush>
+                                                            </Border.Background>
+                                                        </Border>
+
+                                                        <!-- 大卡 150px 渐隐：文字 + 播放条都在这一带 -->
+                                                        <Border Height="150"
+                                                                VerticalAlignment="Bottom"
+                                                                Visibility="{x:Bind HeroVisibility, Mode=OneWay}">
+                                                            <Border.Background>
+                                                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                                    <GradientStop Offset="0" Color="#00000000" />
+                                                                    <GradientStop Offset="0.7" Color="#73000000" />
+                                                                    <GradientStop Offset="1" Color="#A6000000" />
+                                                                </LinearGradientBrush>
+                                                            </Border.Background>
+                                                        </Border>
+
+                                                        <!-- 小卡角标：点赞左下、时长右下（官方 13px 白字） -->
+                                                        <StackPanel Orientation="Horizontal"
+                                                                    HorizontalAlignment="Left"
+                                                                    VerticalAlignment="Bottom"
+                                                                    Margin="10,0,0,7"
+                                                                    Spacing="4"
+                                                                    Visibility="{x:Bind SmallVisibility, Mode=OneWay}">
+                                                            <FontIcon Glyph="&#xEB51;"
+                                                                      FontSize="12"
+                                                                      Foreground="White"
+                                                                      VerticalAlignment="Center" />
+                                                            <TextBlock Text="{x:Bind LikeText}"
+                                                                       FontSize="12"
+                                                                       Foreground="White"
+                                                                       VerticalAlignment="Center" />
+                                                        </StackPanel>
+
+                                                        <TextBlock Text="{x:Bind DurationText}"
+                                                                   HorizontalAlignment="Right"
+                                                                   VerticalAlignment="Bottom"
+                                                                   Margin="0,0,10,7"
+                                                                   FontSize="12"
+                                                                   Foreground="White"
+                                                                   Visibility="{x:Bind SmallVisibility, Mode=OneWay}" />
+
+                                                        <!-- 大卡叠层：作者行在上、标题在下（官方顺序） -->
+                                                        <StackPanel VerticalAlignment="Bottom"
+                                                                    Margin="14,0,14,32"
+                                                                    Spacing="2"
+                                                                    Visibility="{x:Bind HeroVisibility, Mode=OneWay}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                <TextBlock Text="{x:Bind AuthorLine}"
+                                                                           FontSize="12"
+                                                                           Foreground="#CCFFFFFF"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           MaxLines="1" />
+                                                                <TextBlock Text="你的关注"
+                                                                           FontSize="11"
+                                                                           Foreground="#4CD964"
+                                                                           VerticalAlignment="Center"
+                                                                           Visibility="{x:Bind FollowVisibility, Mode=OneWay}" />
+                                                            </StackPanel>
+                                                            <TextBlock Text="{x:Bind Title}"
+                                                                       FontSize="15"
+                                                                       Foreground="White"
+                                                                       MaxLines="2"
+                                                                       TextWrapping="Wrap"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </controls:AspectRatioPanel>
+                                            </Border>
+
+                                            <!-- 小卡信息块：标题两行（高 40）+ 作者行（高 20），合计 72，与布局的 InfoHeight 对齐 -->
+                                            <Grid Grid.Row="1"
+                                                  Height="72"
+                                                  Padding="0,8,0,0"
+                                                  Visibility="{x:Bind SmallVisibility, Mode=OneWay}">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="40" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+
+                                                <TextBlock Text="{x:Bind Title}"
+                                                           FontSize="14"
+                                                           LineHeight="20"
+                                                           MaxLines="2"
+                                                           TextWrapping="Wrap"
+                                                           TextTrimming="CharacterEllipsis" />
+
+                                                <Grid Grid.Row="1" Height="20" Margin="0,4,0,0">
+                                                    <StackPanel Orientation="Horizontal"
+                                                                Spacing="6"
+                                                                Margin="0,0,30,0"
+                                                                VerticalAlignment="Center">
+                                                        <TextBlock Text="{x:Bind AuthorLine}"
+                                                                   FontSize="12"
+                                                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   MaxLines="1" />
+                                                        <TextBlock Text="你的关注"
+                                                                   FontSize="11"
+                                                                   Foreground="#13C15A"
+                                                                   VerticalAlignment="Center"
+                                                                   Visibility="{x:Bind FollowVisibility, Mode=OneWay}" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Grid>
+                                        </Grid>
+                                    </Button>
+
+                                    <!-- ⋮ 浮在作者行右端：悬停才出来（大卡不摆，官方那颗在视频右上，这一版先不做） -->
+                                    <Button x:Name="MoreButton"
+                                            Style="{StaticResource FeaturedMoreStyle}"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Bottom"
+                                            Margin="0,0,0,1"
+                                            Visibility="{x:Bind MoreVisibility, Mode=OneWay}"
+                                            ToolTipService.ToolTip="更多">
+                                        <FontIcon Glyph="&#xE712;" FontSize="13" />
+                                        <Button.Flyout>
+                                            <MenuFlyout Opening="OnMoreFlyoutOpening" Closed="OnMoreFlyoutClosed">
+                                                <MenuFlyoutItem Text="复制链接"
+                                                                Tag="{x:Bind Id}"
+                                                                Click="OnCopyVideoLink" />
+                                                <MenuFlyoutItem Text="在浏览器打开"
+                                                                Tag="{x:Bind Id}"
+                                                                Click="OnOpenVideoInBrowser" />
+                                                <MenuFlyoutItem Text="复制作品 ID"
+                                                                Tag="{x:Bind Id}"
+                                                                Click="OnCopyVideoId" />
+                                            </MenuFlyout>
+                                        </Button.Flyout>
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+
+                    <StackPanel Grid.Row="1"
+                                Margin="0,18,0,0"
+                                HorizontalAlignment="Center"
+                                Spacing="10">
+                        <ProgressRing Width="22"
+                                      Height="22"
+                                      IsActive="True"
+                                      Visibility="{x:Bind ViewModel.BusyVisibility, Mode=OneWay}" />
+                        <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                                   Visibility="{x:Bind ViewModel.StatusVisibility, Mode=OneWay}"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+
+            <!-- 悬停预览：盖在滚动内容之上，只画封面那一格；不吃指针（否则 PointerExited 立刻把预览关掉） -->
+            <controls:FeaturedPreviewControl x:Name="HoverPreview"
+                                             HorizontalAlignment="Left"
+                                             VerticalAlignment="Top"
+                                             Visibility="Collapsed"
+                                             IsHitTestVisible="False" />
+        </Grid>
+    </Grid>
+</Page>

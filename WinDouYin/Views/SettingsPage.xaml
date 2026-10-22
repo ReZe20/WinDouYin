@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinDouYin.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:root="using:WinDouYin"
+    xmlns:viewmodels="using:WinDouYin.ViewModels"
+    d:DataContext="{d:DesignInstance Type=viewmodels:SettingsViewModel}"
+    mc:Ignorable="d"
+    NavigationCacheMode="Enabled">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="75" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   x:Uid="SettingsPage_Title"
+                   FontSize="25"
+                   VerticalAlignment="Bottom"
+                   Margin="30,0,0,6" />
+
+        <!-- 卡片样式与度量由 Windows Community Toolkit 提供（Win11 设置风格） -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="25,10,25,0">
+
+                <TextBlock x:Uid="Settings_Program" Margin="5,10,0,10" />
+
+                <controls:SettingsCard x:Uid="Settings_StartupPage" Margin="0,0,0,10">
+                    <controls:SettingsCard.HeaderIcon>
+                        <FontIcon Glyph="&#xE8A1;" />
+                    </controls:SettingsCard.HeaderIcon>
+                    <!-- AOT 收口：原先用 DisplayMemberPath/SelectedValuePath 两个字符串路径让控件反射取属性，
+                         裁剪后属性元数据不保证还在（警告 WMC1510）。改成 ItemTemplate + x:Bind 的具名绑定，
+                         选中项直接绑 AppPage 本身，Tag 的读写收在 SelectedStartupPage 里。视觉与原来一致。 -->
+                    <ComboBox MinWidth="150"
+                              ItemsSource="{x:Bind ViewModel.AppSettingsVM.StartupPageOptions}"
+                              SelectedItem="{x:Bind ViewModel.AppSettingsVM.SelectedStartupPage, Mode=TwoWay}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="root:AppPage">
+                                <TextBlock Text="{x:Bind DisplayName}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </controls:SettingsCard>
+
+                <TextBlock x:Uid="Settings_Playback" Margin="5,10,0,10" />
+
+                <!-- 二值开关按本页规范放 Header 槽，文案由 CheckBox 自己带；卡片只补描述。
+                     EE94 = 扫描/缓存字形。 -->
+                <controls:SettingsCard x:Uid="Settings_VideoCache" Margin="0,0,0,10">
+                    <controls:SettingsCard.HeaderIcon>
+                        <FontIcon Glyph="&#xEE94;" />
+                    </controls:SettingsCard.HeaderIcon>
+                    <controls:SettingsCard.Header>
+                        <CheckBox x:Uid="Settings_VideoCacheToggle"
+                                  IsChecked="{x:Bind ViewModel.AppSettingsVM.VideoDiskCache, Mode=TwoWay}" />
+                    </controls:SettingsCard.Header>
+                </controls:SettingsCard>
+
+                <TextBlock x:Uid="Settings_ResetHeader" Margin="5,10,0,10" />
+                <Button x:Uid="Settings_ResetButton"
+                        Click="ResetSettingsButton_Click"
+                        Margin="5,10,0,110" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

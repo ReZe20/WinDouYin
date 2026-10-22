@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    开源共享工具面：日志（MfLog）、JSON 字面量转义（JsonText）、使用账本（UsageStore）。
+    这三样都不碰抖音服务器，但闭源那半要用——NativeFeed/AccountStore 写 mf.log，
+    FeedService 认完账号之后要把账本切到当前 uid。合成一份放这儿，避免两边各编一份副本：
+    两份 MfLog 会抢同一个文件（StreamWriter 默认只开 FileShare.Read，第二份当场抛），
+    两份 UsageStore 会各攒各的内存状态再整本写回同一个 usage.<键>.json，后写的把先写的盖掉。
+    TFM 同样用裸 net10.0。
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>WinDouYin.Core</AssemblyName>
+    <RootNamespace>WinDouYin</RootNamespace>
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+
+</Project>

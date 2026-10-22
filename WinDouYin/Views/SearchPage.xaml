@@ -1,0 +1,503 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinDouYin.Views.SearchPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:WinDouYin.ViewModels"
+    mc:Ignorable="d"
+    NavigationCacheMode="Required">
+
+    <Page.Resources>
+        <!-- 卡=带描边的系统卡片；行=无框无底。两者的悬停/按下/焦点视觉都由 Button 自带的视觉状态出，代码不参与 -->
+        <Style x:Key="CardButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{ThemeResource ControlCornerRadius}" />
+        </Style>
+
+        <Style x:Key="RowButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+    </Page.Resources>
+
+    <Grid Padding="24,0,24,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 头：关键词 + 状态；正在取时右边转圈，滚到底续页也走同一颗。
+             返回键不在这里——归左栏那颗 NavigationView 原生 BackButton（MainWindow.SyncNavBack）。 -->
+        <Grid Grid.Row="0" Margin="0,16,0,4" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Spacing="2" VerticalAlignment="Center">
+                <TextBlock x:Name="TitleText"
+                           Style="{StaticResource SubtitleTextBlockStyle}"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                           Style="{StaticResource CaptionTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+            </StackPanel>
+
+            <ProgressRing Grid.Column="1"
+                          Width="20"
+                          Height="20"
+                          VerticalAlignment="Center"
+                          IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                          Visibility="{x:Bind ViewModel.LoadingVisibility, Mode=OneWay}" />
+        </Grid>
+
+        <!-- 页签与工具条都在 Pivot 这一行：左边系统页签（综合/视频/用户），RightHeader 放视图与筛选。
+             Pivot 只当页签条用，三枚 PivotItem 不挂内容——结果区是共享的一整块，切页签换的是账面不是控件树。
+             直播页签接口实测有回包（data[].lives 14 条），但应用还没有直播播放，不摆这枚进不去的页签。 -->
+        <Pivot x:Name="Tabs" Grid.Row="1">
+            <Pivot.RightHeader>
+                <StackPanel Orientation="Horizontal"
+                            Spacing="8"
+                            VerticalAlignment="Center">
+                    <!-- 多列/单列只在综合页签给；主按钮直接翻态，下拉里两枚互斥项按账面勾选 -->
+                    <ToggleSplitButton VerticalAlignment="Center"
+                                       IsChecked="{x:Bind ViewModel.SingleColumn, Mode=OneWay}"
+                                       Visibility="{x:Bind ViewModel.ColumnToggleVisibility, Mode=OneWay}"
+                                       Click="OnColumnPrimaryClick">
+                        <TextBlock Text="{x:Bind ViewModel.ColumnModeText, Mode=OneWay}"
+                                   Style="{StaticResource BodyTextBlockStyle}"
+                                   VerticalAlignment="Center" />
+                        <ToggleSplitButton.Flyout>
+                            <MenuFlyout>
+                                <RadioMenuFlyoutItem Text="多列"
+                                                     GroupName="viewmode"
+                                                     Tag="multi"
+                                                     IsChecked="{x:Bind ViewModel.MultiColumn, Mode=OneWay}"
+                                                     Click="OnViewModeClick" />
+                                <RadioMenuFlyoutItem Text="单列"
+                                                     GroupName="viewmode"
+                                                     Tag="single"
+                                                     IsChecked="{x:Bind ViewModel.SingleColumn, Mode=OneWay}"
+                                                     Click="OnViewModeClick" />
+                            </MenuFlyout>
+                        </ToggleSplitButton.Flyout>
+                    </ToggleSplitButton>
+
+                    <!-- 筛选只有综合/视频有值（官方用户/直播页签的 filter 是空数组）。
+                         有没有生效筛选用一枚系统强调色小圆点报，具体是哪几项写进 ToolTip；
+                         面板里两组 RadioButtons 是系统单选列表。 -->
+                    <DropDownButton VerticalAlignment="Center"
+                                    ToolTipService.ToolTip="{x:Bind ViewModel.FilterSummaryText, Mode=OneWay}"
+                                    Visibility="{x:Bind ViewModel.FilterVisibility, Mode=OneWay}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE71C;" FontSize="14" VerticalAlignment="Center" />
+                            <TextBlock Text="筛选"
+                                       Style="{StaticResource BodyTextBlockStyle}"
+                                       VerticalAlignment="Center" />
+                            <Ellipse Width="6"
+                                     Height="6"
+                                     VerticalAlignment="Center"
+                                     Fill="{ThemeResource AccentFillColorDefaultBrush}"
+                                     Visibility="{x:Bind ViewModel.FilterBadgeVisibility, Mode=OneWay}" />
+                        </StackPanel>
+                        <DropDownButton.Flyout>
+                            <Flyout x:Name="FilterFlyout" ShouldConstrainToRootBounds="False">
+                                <StackPanel Width="150" Spacing="16">
+                                    <RadioButtons x:Name="SortGroup" Header="排序依据">
+                                        <x:String>综合排序</x:String>
+                                        <x:String>最多点赞</x:String>
+                                        <x:String>最新发布</x:String>
+                                    </RadioButtons>
+                                    <RadioButtons x:Name="TimeGroup" Header="发布时间">
+                                        <x:String>不限</x:String>
+                                        <x:String>一天内</x:String>
+                                        <x:String>一周内</x:String>
+                                        <x:String>半年内</x:String>
+                                    </RadioButtons>
+                                </StackPanel>
+                            </Flyout>
+                        </DropDownButton.Flyout>
+                    </DropDownButton>
+                </StackPanel>
+            </Pivot.RightHeader>
+
+            <PivotItem Header="综合" />
+            <PivotItem Header="视频" />
+            <PivotItem Header="用户" />
+        </Pivot>
+
+        <!-- 相关词整排（回包 guide_search_words[]）：每枚都是系统 ToggleButton，选中态就是 IsChecked，
+             悬停/按下/焦点矩形全是控件自带；点一枚把关键词改成「词 该词」重搜 -->
+        <ScrollViewer Grid.Row="2"
+                      Margin="0,0,0,12"
+                      HorizontalScrollBarVisibility="Auto"
+                      HorizontalScrollMode="Auto"
+                      VerticalScrollBarVisibility="Disabled"
+                      VerticalScrollMode="Disabled"
+                      Visibility="{x:Bind ViewModel.ChipsVisibility, Mode=OneWay}">
+            <ItemsRepeater ItemsSource="{x:Bind ViewModel.Chips}">
+                <ItemsRepeater.Layout>
+                    <StackLayout Orientation="Horizontal" Spacing="8" />
+                </ItemsRepeater.Layout>
+                <ItemsRepeater.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SearchChip">
+                        <ToggleButton Content="{x:Bind Text}"
+                                      IsChecked="{x:Bind IsSelected, Mode=OneWay}"
+                                      Tag="{x:Bind Word}"
+                                      Click="OnChipClick" />
+                    </DataTemplate>
+                </ItemsRepeater.ItemTemplate>
+            </ItemsRepeater>
+        </ScrollViewer>
+
+        <!-- 结果区：卡宽/封面比例沿用网页版实测（220 卡 · 封面 164 ≈ 4:3 · 单列行画面 710×399 = 宽×9/16），
+             描边、圆角、字阶与间距全换成系统资源（CardBackground/CardStroke + ControlCornerRadius + Body/Caption + 12 栅格）。
+             点卡的行为在 Button 上，所以悬停、按下、键盘 Enter/空格都是系统那套。 -->
+        <Grid Grid.Row="3" Margin="0,0,0,20">
+            <ScrollViewer x:Name="ResultScroll"
+                          VerticalScrollBarVisibility="Auto"
+                          VerticalScrollMode="Auto"
+                          ViewChanged="OnResultScrollChanged">
+                <Grid>
+                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.Results}"
+                                   Visibility="{x:Bind ViewModel.MultiViewVisibility, Mode=OneWay}"
+                                   SizeChanged="OnRepeaterSizeChanged">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="220"
+                                               MinColumnSpacing="12"
+                                               MinRowSpacing="12"
+                                               ItemsStretch="Fill" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SearchResultRow">
+                                <Button Style="{StaticResource CardButtonStyle}"
+                                        Tag="{x:Bind Id}"
+                                        Click="OnCardClick">
+                                    <StackPanel>
+                                        <Grid Height="164"
+                                              Background="{ThemeResource ControlFillColorSecondaryBrush}">
+                                            <Image Source="{x:Bind Cover}" Stretch="UniformToFill" />
+
+                                            <StackPanel Orientation="Horizontal"
+                                                        Margin="8,0,0,8"
+                                                        HorizontalAlignment="Left"
+                                                        VerticalAlignment="Bottom"
+                                                        IsHitTestVisible="False">
+                                                <FontIcon Width="20"
+                                                          Height="20"
+                                                          FontSize="14"
+                                                          Glyph="&#xEB51;"
+                                                          Foreground="White"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center" />
+                                                <TextBlock Text="{x:Bind LikeText}"
+                                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                                           Foreground="White"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+
+                                            <Border Height="20"
+                                                    Padding="6,0,6,0"
+                                                    Margin="0,0,8,8"
+                                                    HorizontalAlignment="Right"
+                                                    VerticalAlignment="Bottom"
+                                                    Background="#B3000000"
+                                                    CornerRadius="{ThemeResource ControlCornerRadius}"
+                                                    Visibility="{x:Bind DurationVisibility}">
+                                                <TextBlock Text="{x:Bind DurationText}"
+                                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                                           Foreground="White"
+                                                           VerticalAlignment="Center" />
+                                            </Border>
+
+                                            <!-- 图文帖：「图文」标放封面左上 -->
+                                            <Border Height="20"
+                                                    Padding="6,0,6,0"
+                                                    Margin="8,8,0,0"
+                                                    HorizontalAlignment="Left"
+                                                    VerticalAlignment="Top"
+                                                    Background="#B3000000"
+                                                    CornerRadius="{ThemeResource ControlCornerRadius}"
+                                                    Visibility="{x:Bind ImageBadgeVisibility}">
+                                                <TextBlock Text="图文"
+                                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                                           Foreground="White"
+                                                           VerticalAlignment="Center" />
+                                            </Border>
+                                        </Grid>
+
+                                        <StackPanel Padding="12" Spacing="6">
+                                            <TextBlock Text="{x:Bind Desc}"
+                                                       Style="{StaticResource BodyTextBlockStyle}"
+                                                       MaxLines="2"
+                                                       TextWrapping="Wrap"
+                                                       TextTrimming="CharacterEllipsis" />
+
+                                            <Grid ColumnSpacing="6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBlock Text="{x:Bind Author}"
+                                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{x:Bind DateText}"
+                                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                                           VerticalAlignment="Center"
+                                                           Visibility="{x:Bind DateVisibility}"
+                                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+
+                    <!-- 单列：整宽一行——作者行、标题两行、16:9 画面沉在下边（官方那 33px 播放控制条不做，
+                         我们没有内联播放）；行本身是无框 Button，按下/悬停只剩系统那层轻覆盖 -->
+                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.Results}"
+                                   Visibility="{x:Bind ViewModel.SingleViewVisibility, Mode=OneWay}"
+                                   SizeChanged="OnRepeaterSizeChanged">
+                        <ItemsRepeater.Layout>
+                            <StackLayout Spacing="24" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SearchResultRow">
+                                <Button Style="{StaticResource RowButtonStyle}"
+                                        MaxWidth="710"
+                                        HorizontalAlignment="Center"
+                                        Tag="{x:Bind Id}"
+                                        Click="OnCardClick">
+                                    <StackPanel Spacing="12">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Grid Width="42"
+                                                  Height="42"
+                                                  VerticalAlignment="Center">
+                                                <Ellipse>
+                                                    <Ellipse.Fill>
+                                                        <ImageBrush ImageSource="{x:Bind Avatar}" Stretch="UniformToFill" />
+                                                    </Ellipse.Fill>
+                                                </Ellipse>
+                                                <TextBlock Text="{x:Bind Initials}"
+                                                           Style="{StaticResource SubtitleTextBlockStyle}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Visibility="{x:Bind InitialsVisibility}"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <Ellipse Stroke="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                         StrokeThickness="1"
+                                                         IsHitTestVisible="False" />
+                                            </Grid>
+
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{x:Bind Name}"
+                                                       Style="{StaticResource BodyStrongTextBlockStyle}"
+                                                       MaxLines="1"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{x:Bind DateText}"
+                                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                                       VerticalAlignment="Center"
+                                                       Visibility="{x:Bind DateVisibility}"
+                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                        </Grid>
+
+                                        <TextBlock Text="{x:Bind Desc}"
+                                                   Style="{StaticResource BodyStrongTextBlockStyle}"
+                                                   MaxLines="2"
+                                                   TextWrapping="Wrap"
+                                                   TextTrimming="CharacterEllipsis" />
+
+                                        <Border Height="399"
+                                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                                CornerRadius="{ThemeResource ControlCornerRadius}">
+                                            <Grid>
+                                                <Image Source="{x:Bind Cover}" Stretch="UniformToFill" />
+
+                                                <StackPanel Orientation="Horizontal"
+                                                            Margin="12,0,0,12"
+                                                            HorizontalAlignment="Left"
+                                                            VerticalAlignment="Bottom"
+                                                            IsHitTestVisible="False">
+                                                    <FontIcon Width="20"
+                                                              Height="20"
+                                                              FontSize="14"
+                                                              Glyph="&#xEB51;"
+                                                              Foreground="White"
+                                                              HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center" />
+                                                    <TextBlock Text="{x:Bind LikeText}"
+                                                               Style="{StaticResource CaptionTextBlockStyle}"
+                                                               Foreground="White"
+                                                               VerticalAlignment="Center" />
+                                                </StackPanel>
+
+                                                <Border Height="20"
+                                                        Padding="6,0,6,0"
+                                                        Margin="0,0,12,12"
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Bottom"
+                                                        Background="#B3000000"
+                                                        CornerRadius="{ThemeResource ControlCornerRadius}"
+                                                        Visibility="{x:Bind DurationVisibility}">
+                                                    <TextBlock Text="{x:Bind DurationText}"
+                                                               Style="{StaticResource CaptionTextBlockStyle}"
+                                                               Foreground="White"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+
+                                                <Border Height="20"
+                                                        Padding="6,0,6,0"
+                                                        Margin="12,12,0,0"
+                                                        HorizontalAlignment="Left"
+                                                        VerticalAlignment="Top"
+                                                        Background="#B3000000"
+                                                        CornerRadius="{ThemeResource ControlCornerRadius}"
+                                                        Visibility="{x:Bind ImageBadgeVisibility}">
+                                                    <TextBlock Text="图文"
+                                                               Style="{StaticResource CaptionTextBlockStyle}"
+                                                               Foreground="White"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+
+                    <!-- 用户页签：整宽卡一行（头像 + 昵称 + 抖音号/获赞/粉丝 + 简介）。
+                         官方那颗「关注」是写操作，这里不放 -->
+                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.UserResults}"
+                                   Visibility="{x:Bind ViewModel.UserViewVisibility, Mode=OneWay}"
+                                   SizeChanged="OnRepeaterSizeChanged">
+                        <ItemsRepeater.Layout>
+                            <StackLayout Spacing="8" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SearchUserRow">
+                                <!-- 点一行进作者主页（第五十四轮记的「用户行点不开主页」在这收掉） -->
+                                <Button Style="{StaticResource CardButtonStyle}"
+                                        Padding="16"
+                                        Tag="{x:Bind SecUid}"
+                                        Click="OnUserClick">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Grid Width="56"
+                                              Height="56"
+                                              VerticalAlignment="Center">
+                                            <Ellipse Visibility="{x:Bind AvatarVisibility}">
+                                                <Ellipse.Fill>
+                                                    <ImageBrush ImageSource="{x:Bind Avatar}" Stretch="UniformToFill" />
+                                                </Ellipse.Fill>
+                                            </Ellipse>
+                                            <TextBlock Text="{x:Bind Initials}"
+                                                       Style="{StaticResource SubtitleTextBlockStyle}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Visibility="{x:Bind InitialsVisibility}"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <Ellipse Stroke="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                     StrokeThickness="1"
+                                                     IsHitTestVisible="False" />
+                                        </Grid>
+
+                                        <StackPanel Grid.Column="1"
+                                                    VerticalAlignment="Center"
+                                                    Spacing="2">
+                                            <TextBlock Text="{x:Bind Name}"
+                                                       Style="{StaticResource BodyStrongTextBlockStyle}"
+                                                       TextTrimming="CharacterEllipsis" />
+
+                                            <StackPanel Orientation="Horizontal"
+                                                        Spacing="8"
+                                                        Visibility="{x:Bind HasStatsVisibility}">
+                                                <TextBlock Text="{x:Bind HandleText}"
+                                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                                           Visibility="{x:Bind HandleVisibility}"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <Border Width="1"
+                                                        Height="10"
+                                                        VerticalAlignment="Center"
+                                                        Visibility="{x:Bind FirstDividerVisibility}"
+                                                        Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                                <TextBlock Text="{x:Bind FavoritedText}"
+                                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                                           Visibility="{x:Bind FavoritedVisibility}"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <Border Width="1"
+                                                        Height="10"
+                                                        VerticalAlignment="Center"
+                                                        Visibility="{x:Bind SecondDividerVisibility}"
+                                                        Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                                <TextBlock Text="{x:Bind FollowerText}"
+                                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                                           Visibility="{x:Bind FollowerVisibility}"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+
+                                            <TextBlock Text="{x:Bind Signature}"
+                                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                                       MaxLines="2"
+                                                       TextWrapping="Wrap"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Visibility="{x:Bind SignatureVisibility}"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                </Grid>
+            </ScrollViewer>
+
+            <!-- 空态/没搜到：盖在结果区中间，取到东西就收 -->
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="10"
+                        Visibility="{x:Bind ViewModel.EmptyVisibility, Mode=OneWay}">
+                <FontIcon Glyph="&#xE721;"
+                          FontSize="30"
+                          Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                <TextBlock Text="{x:Bind ViewModel.EmptyText, Mode=OneWay}"
+                           Style="{StaticResource BodyTextBlockStyle}"
+                           HorizontalAlignment="Center"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Page>

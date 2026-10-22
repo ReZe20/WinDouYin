@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinDouYin.Views.VideoPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:WinDouYin.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <!-- 一条视频一整页的标准层：视频舞台 + 信息区 + 右侧竖排 + 控制条都在 MfStageControl 里，
+         页面只负责把一条 VideoEntry 接上去。推荐页和消息分享页都放两份轮流上场。
+         放映与释放由宿主管：Suspend/Resume 松掉/重架播放源，不靠页面缓存与否。 -->
+    <Grid>
+        <controls:MfStageControl x:Name="Stage"
+                                  ItemId="{x:Bind Entry.Id, Mode=OneWay}"
+                                  Qualities="{x:Bind Entry.Qualities, Mode=OneWay}"
+                                  Music="{x:Bind Entry.Music, Mode=OneWay}"
+                                  Source="{x:Bind Entry.Source, Mode=OneWay}"
+                                  Cover="{x:Bind Entry.Cover, Mode=OneWay}"
+                                  VideoWidth="{x:Bind Entry.Width, Mode=OneWay}"
+                                  VideoHeight="{x:Bind Entry.Height, Mode=OneWay}"
+                                  Author="{x:Bind Entry.Author, Mode=OneWay}"
+                                  AuthorId="{x:Bind Entry.AuthorId, Mode=OneWay}"
+                                  AuthorSecUid="{x:Bind Entry.AuthorSecUid, Mode=OneWay}"
+                                  AuthorOpenRequested="OnAuthorOpen"
+                                  TimeText="{x:Bind Entry.TimeText, Mode=OneWay}"
+                                  Desc="{x:Bind Entry.Desc, Mode=OneWay}"
+                                  FriendRecommender="{x:Bind Entry.FriendRecommender, Mode=OneWay}"
+                                  Avatar="{x:Bind Entry.Avatar, Mode=OneWay}"
+                                  DiggText="{x:Bind Entry.DiggText, Mode=OneWay}"
+                                  CommentText="{x:Bind Entry.CommentText, Mode=OneWay}"
+                                  CollectText="{x:Bind Entry.CollectText, Mode=OneWay}"
+                                  ShareText="{x:Bind Entry.ShareText, Mode=OneWay}"
+                                  DiggRaw="{x:Bind Entry.Digg, Mode=OneWay}"
+                                  CommentRaw="{x:Bind Entry.Comment, Mode=OneWay}"
+                                  CollectRaw="{x:Bind Entry.Collect, Mode=OneWay}"
+                                  ShareRaw="{x:Bind Entry.Share, Mode=OneWay}"
+                                  AutoPlay="{x:Bind Settings.AppSettingsVM.AutoPlay, Mode=TwoWay}"
+                                  DanmakuOn="{x:Bind Settings.AppSettingsVM.DanmakuOn, Mode=TwoWay}"
+                                  Volume="{x:Bind Settings.AppSettingsVM.Volume, Mode=TwoWay}"
+                                  QualityKey="{x:Bind Settings.AppSettingsVM.QualityKey, Mode=TwoWay}" />
+        <TextBlock Text="{x:Bind StatusText, Mode=OneWay}"
+                   Foreground="#FFFFFFFF"
+                   Margin="8"
+                   HorizontalAlignment="Left"
+                   VerticalAlignment="Top" />
+    </Grid>
+</Page>
